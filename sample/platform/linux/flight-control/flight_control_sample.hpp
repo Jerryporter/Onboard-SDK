@@ -55,7 +55,7 @@
     Use unless you want to do other stuff during takeoff - this will block
     the main thread.
 !*/
-bool monitoredTakeoff(DJI::OSDK::Vehicle* vehiclePtr, int timeout = 1);
+bool monitoredTakeoff(DJI::OSDK::Vehicle *vehiclePtr, int timeout = 1);
 
 // Examples of commonly used Flight Mode APIs
 
@@ -77,7 +77,7 @@ bool moveByPositionOffset(DJI::OSDK::Vehicle *vehicle, float xOffsetDesired,
     and only returns when takeoff is complete.
 
 !*/
-bool monitoredLanding(DJI::OSDK::Vehicle* vehiclePtr, int timeout = 1);
+bool monitoredLanding(DJI::OSDK::Vehicle *vehiclePtr, int timeout = 1);
 
 // Helper Functions
 
@@ -86,12 +86,11 @@ bool monitoredLanding(DJI::OSDK::Vehicle* vehiclePtr, int timeout = 1);
  *
  * Accurate when distances are small.
 !*/
-void localOffsetFromGpsOffset(DJI::OSDK::Vehicle*             vehicle,
-                              DJI::OSDK::Telemetry::Vector3f& deltaNed,
-                              void* target, void* origin);
+void localOffsetFromGpsOffset(DJI::OSDK::Vehicle *vehicle,
+                              DJI::OSDK::Telemetry::Vector3f &deltaNed,
+                              void *target, void *origin);
 
-DJI::OSDK::Telemetry::Vector3f toEulerAngle(void* quaternionData);
-bool startGlobalPositionBroadcast(DJI::OSDK::Vehicle* vehicle);
-
+DJI::OSDK::Telemetry::Vector3f toEulerAngle(void *quaternionData);
+bool startGlobalPositionBroadcast(DJI::OSDK::Vehicle *vehicle);
 
 #endif // DJIOSDK_FLIGHTCONTROL_HPP

@@ -29,7 +29,7 @@ int
 main(int argc, char** argv)
 {
   // Setup OSDK.
-  bool enableAdvancedSensing = true;
+  bool       enableAdvancedSensing = true;
   LinuxSetup linuxEnvironment(argc, argv, enableAdvancedSensing);
   Vehicle*   vehicle = linuxEnvironment.getVehicle();
   if (vehicle == NULL)
@@ -38,15 +38,22 @@ main(int argc, char** argv)
     return -1;
   }
 
-  if (vehicle->isM210V2()) {
-    if (argc >= 3) {
+  if (vehicle->isM210V2())
+  {
+    if (argc >= 3)
+    {
       DSTATUS("Input yaml file: %s\n", argv[2]);
-    } else {
+    }
+    else
+    {
       DERROR("Please specify a yaml file with camera parameters\n");
-      DERROR("Example: ./stereo-vision-depth-perception-sample UserConfig.txt m210_stereo_param.yaml\n");
+      DERROR("Example: ./stereo-vision-depth-perception-sample UserConfig.txt "
+             "m210_stereo_param.yaml\n");
       return -1;
     }
-  } else if (vehicle->isM300()) {
+  }
+  else if (vehicle->isM300())
+  {
     DSTATUS("M300 stereo parameters can be got from the drone. So yaml file is"
             "not need here for M300 stereo camera.");
   }
@@ -57,14 +64,18 @@ main(int argc, char** argv)
   vehicle->control->obtainCtrlAuthority(functionTimeout);
 
   /*! get stereo camera parameters */
-  if (vehicle->isM210V2()) {
+  if (vehicle->isM210V2())
+  {
     std::string yaml_file_path = argv[2];
     M210_STEREO::Config::setParamFile(yaml_file_path);
-  } else if (vehicle->isM300()) {
-    M300StereoParamTool *tool = new M300StereoParamTool(vehicle);
+  }
+  else if (vehicle->isM300())
+  {
+    M300StereoParamTool*     tool = new M300StereoParamTool(vehicle);
     Perception::CamParamType stereoParam =
-        tool->getM300stereoParams(Perception::DirectionType::RECTIFY_FRONT);
-    if (tool->createStereoParamsYamlFile(M300_FRONT_STEREO_PARAM_YAML_NAME, stereoParam))
+      tool->getM300stereoParams(Perception::DirectionType::RECTIFY_FRONT);
+    if (tool->createStereoParamsYamlFile(M300_FRONT_STEREO_PARAM_YAML_NAME,
+                                         stereoParam))
       tool->setParamFileForM300(M300_FRONT_STEREO_PARAM_YAML_NAME);
     else
       return -1;
@@ -94,44 +105,52 @@ main(int argc, char** argv)
     case 'a':
     {
       // register a callback for "image processing" thread
-      image_process_container_ptr->setCallbackHandler(&StereoProcessContainer::displayStereoRectImgCallback,
-                                                      dynamic_cast<StereoProcessContainer*>(image_process_container_ptr));
+      image_process_container_ptr->setCallbackHandler(
+        &StereoProcessContainer::displayStereoRectImgCallback,
+        dynamic_cast<StereoProcessContainer*>(image_process_container_ptr));
       // register a callback for "image reading" thread
-      vehicle->advancedSensing->subscribeFrontStereoVGA(AdvancedSensingProtocol::FREQ_20HZ, &storeStereoImgVGACallback, NULL);
+      vehicle->advancedSensing->subscribeFrontStereoVGA(
+        AdvancedSensingProtocol::FREQ_20HZ, &storeStereoImgVGACallback, NULL);
     }
-      break;
+    break;
     case 'b':
     {
       // register a callback for "image processing" thread
-      image_process_container_ptr->setCallbackHandler(&StereoProcessContainer::displayStereoDisparityCallback,
-                                                      dynamic_cast<StereoProcessContainer*>(image_process_container_ptr));
+      image_process_container_ptr->setCallbackHandler(
+        &StereoProcessContainer::displayStereoDisparityCallback,
+        dynamic_cast<StereoProcessContainer*>(image_process_container_ptr));
       // register a callback for "image reading" thread
-      vehicle->advancedSensing->subscribeFrontStereoVGA(AdvancedSensingProtocol::FREQ_20HZ, &storeStereoImgVGACallback, NULL);
+      vehicle->advancedSensing->subscribeFrontStereoVGA(
+        AdvancedSensingProtocol::FREQ_20HZ, &storeStereoImgVGACallback, NULL);
     }
-      break;
+    break;
     case 'c':
     {
       // register a callback for "image processing" thread
-      image_process_container_ptr->setCallbackHandler(&StereoProcessContainer::displayStereoFilteredDisparityCallback,
-                                                      dynamic_cast<StereoProcessContainer*>(image_process_container_ptr));
+      image_process_container_ptr->setCallbackHandler(
+        &StereoProcessContainer::displayStereoFilteredDisparityCallback,
+        dynamic_cast<StereoProcessContainer*>(image_process_container_ptr));
       // register a callback for "image reading" thread
-      vehicle->advancedSensing->subscribeFrontStereoVGA(AdvancedSensingProtocol::FREQ_20HZ, &storeStereoImgVGACallback, NULL);
+      vehicle->advancedSensing->subscribeFrontStereoVGA(
+        AdvancedSensingProtocol::FREQ_20HZ, &storeStereoImgVGACallback, NULL);
     }
-      break;
+    break;
     case 'd':
     {
       // register a callback for "image processing" thread
-      image_process_container_ptr->setCallbackHandler(&StereoProcessContainer::displayStereoPtCloudCallback,
-                                                      dynamic_cast<StereoProcessContainer*>(image_process_container_ptr));
+      image_process_container_ptr->setCallbackHandler(
+        &StereoProcessContainer::displayStereoPtCloudCallback,
+        dynamic_cast<StereoProcessContainer*>(image_process_container_ptr));
       // register a callback for "image reading" thread
-      vehicle->advancedSensing->subscribeFrontStereoVGA(AdvancedSensingProtocol::FREQ_20HZ, &storeStereoImgVGACallback, NULL);
+      vehicle->advancedSensing->subscribeFrontStereoVGA(
+        AdvancedSensingProtocol::FREQ_20HZ, &storeStereoImgVGACallback, NULL);
     }
-      break;
+    break;
     case 'e':
     {
       vehicle->advancedSensing->unsubscribeVGAImages();
     }
-      break;
+    break;
     default:
       break;
   }
@@ -152,7 +171,10 @@ main(int argc, char** argv)
 //! Another thread is created inside ImageProcessContainer.
 //! Whenever the images are copied, another callback on
 //! processing thread will perform the image computation
-void storeStereoImgVGACallback(Vehicle *vehiclePtr, RecvContainer recvFrame, UserData userData)
+void
+storeStereoImgVGACallback(Vehicle*      vehiclePtr,
+                          RecvContainer recvFrame,
+                          UserData      userData)
 {
   DSTATUS("sample VGACallback receive an image at frame: %d and time stamp: %u",
           recvFrame.recvData.stereoVGAImgData->frame_index,
