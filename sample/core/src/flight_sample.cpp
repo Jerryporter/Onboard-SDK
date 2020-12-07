@@ -36,45 +36,61 @@ using namespace DJI::OSDK;
 using namespace DJI::OSDK::Telemetry;
 
 static const double EarthCenter = 6378137.0;
-static const double DEG2RAD = 0.01745329252;
+static const double DEG2RAD     = 0.01745329252;
 
-FlightSample::FlightSample(Vehicle* vehicle) { this->vehicle = vehicle; }
-FlightSample::~FlightSample() {}
+FlightSample::FlightSample(Vehicle* vehicle)
+{
+  this->vehicle = vehicle;
+}
+FlightSample::~FlightSample()
+{
+}
 
-bool FlightSample::monitoredTakeoff(int timeout) {
-  int pkgIndex = 0;
-  int freq = 10;
-  TopicName topicList10Hz[] = {TOPIC_STATUS_FLIGHT, TOPIC_STATUS_DISPLAYMODE};
-  int topicSize = sizeof(topicList10Hz) / sizeof(topicList10Hz[0]);
+bool
+FlightSample::monitoredTakeoff(int timeout)
+{
+  int       pkgIndex        = 0;
+  int       freq            = 10;
+  TopicName topicList10Hz[] = { TOPIC_STATUS_FLIGHT, TOPIC_STATUS_DISPLAYMODE };
+  int       topicSize       = sizeof(topicList10Hz) / sizeof(topicList10Hz[0]);
   setUpSubscription(pkgIndex, freq, topicList10Hz, topicSize, timeout);
 
   //! Start takeoff
-  //ErrorCode::ErrorCodeType takeoffStatus =
-      vehicle->flightController->startTakeoffSync(timeout);
+  // ErrorCode::ErrorCodeType takeoffStatus =
+  vehicle->flightController->startTakeoffSync(timeout);
 
   //! Motors start check
-  if (!motorStartedCheck()) {
+  if (!motorStartedCheck())
+  {
     std::cout << "Takeoff failed. Motors are not spinning." << std::endl;
     teardownSubscription(pkgIndex, timeout);
     return false;
-  } else {
+  }
+  else
+  {
     std::cout << "Motors spinning...\n";
   }
   //! In air check
-  if (!takeOffInAirCheck()) {
+  if (!takeOffInAirCheck())
+  {
     std::cout << "Takeoff failed. Aircraft is still on the ground, but the "
                  "motors are spinning."
               << std::endl;
     teardownSubscription(pkgIndex, timeout);
     return false;
-  } else {
+  }
+  else
+  {
     std::cout << "Ascending...\n";
   }
 
   //! Finished takeoff check
-  if (takeoffFinishedCheck()) {
+  if (takeoffFinishedCheck())
+  {
     std::cout << "Successful takeoff!\n";
-  } else {
+  }
+  else
+  {
     std::cout << "Takeoff finished, but the aircraft is in an unexpected mode. "
                  "Please connect DJI GO.\n";
     teardownSubscription(pkgIndex, timeout);
@@ -84,31 +100,34 @@ bool FlightSample::monitoredTakeoff(int timeout) {
   return true;
 }
 
-bool FlightSample::monitoredLanding(int timeout)
+bool
+FlightSample::monitoredLanding(int timeout)
 {
-   /*! Step 1: Verify and setup the subscription */
-  const int pkgIndex = 0;
-  int freq = 10;
-  TopicName topicList[] = {TOPIC_STATUS_FLIGHT, TOPIC_STATUS_DISPLAYMODE};
-  int topicSize = sizeof(topicList) / sizeof(topicList[0]);
+  /*! Step 1: Verify and setup the subscription */
+  const int pkgIndex    = 0;
+  int       freq        = 10;
+  TopicName topicList[] = { TOPIC_STATUS_FLIGHT, TOPIC_STATUS_DISPLAYMODE };
+  int       topicSize   = sizeof(topicList) / sizeof(topicList[0]);
   setUpSubscription(pkgIndex, freq, topicList, topicSize, timeout);
 
   /*! Step 2: Start landing */
   DSTATUS("Start landing action");
-  ErrorCode::ErrorCodeType landingErrCode = vehicle->flightController->startLandingSync(timeout);
+  ErrorCode::ErrorCodeType landingErrCode =
+    vehicle->flightController->startLandingSync(timeout);
   if (landingErrCode != ErrorCode::SysCommonErr::Success)
   {
-    DERROR( "Fail to execute landing action! Error code: "
-            "%llx\n ",landingErrCode);
+    DERROR("Fail to execute landing action! Error code: "
+           "%llx\n ",
+           landingErrCode);
     return false;
   }
 
-   /*! Step 3: check Landing start*/
+  /*! Step 3: check Landing start*/
   if (!checkActionStarted(VehicleStatus::DisplayMode::MODE_AUTO_LANDING))
   {
     DERROR("Fail to execute Landing action!");
     return false;
-  } 
+  }
   else
   {
     /*! Step 4: check Landing finished*/
@@ -128,15 +147,15 @@ bool FlightSample::monitoredLanding(int timeout)
   /*! Step 5: Cleanup */
   teardownSubscription(pkgIndex, timeout);
   return true;
-
 }
 
-
-void FlightSample::velocityAndYawRateCtrl(const Vector3f &offsetDesired,
-                                          float yawRate,uint32_t timeMs)
+void
+FlightSample::velocityAndYawRateCtrl(const Vector3f& offsetDesired,
+                                     float           yawRate,
+                                     uint32_t        timeMs)
 {
-  uint32_t originTime  = 0;
-  uint32_t currentTime = 0;
+  uint32_t originTime      = 0;
+  uint32_t currentTime     = 0;
   uint32_t elapsedTimeInMs = 0;
   OsdkOsal_GetTimeMs(&originTime);
   OsdkOsal_GetTimeMs(&currentTime);
@@ -151,10 +170,12 @@ void FlightSample::velocityAndYawRateCtrl(const Vector3f &offsetDesired,
   };
 
   vehicle->flightController->setJoystickMode(joystickMode);
-  FlightController::JoystickCommand joystickCommand = {offsetDesired.x, offsetDesired.y, offsetDesired.z,yawRate};
+  FlightController::JoystickCommand joystickCommand = {
+    offsetDesired.x, offsetDesired.y, offsetDesired.z, yawRate
+  };
   vehicle->flightController->setJoystickCommand(joystickCommand);
 
-  while(elapsedTimeInMs <= timeMs)
+  while (elapsedTimeInMs <= timeMs)
   {
     vehicle->flightController->joystickAction();
     usleep(20000);
@@ -163,38 +184,44 @@ void FlightSample::velocityAndYawRateCtrl(const Vector3f &offsetDesired,
   }
 }
 
- void FlightSample::emergencyBrake()
- {
-   vehicle->flightController->emergencyBrakeAction();
- }
+void
+FlightSample::emergencyBrake()
+{
+  vehicle->flightController->emergencyBrakeAction();
+}
 
-bool FlightSample::moveByPositionOffset(const Vector3f& offsetDesired,
-                                        float yawDesiredInDeg,
-                                        float posThresholdInM,
-                                        float yawThresholdInDeg) {
+bool
+FlightSample::moveByPositionOffset(const Vector3f& offsetDesired,
+                                   float           yawDesiredInDeg,
+                                   float           posThresholdInM,
+                                   float           yawThresholdInDeg)
+{
   int responseTimeout = 1;
   int timeoutInMilSec = 40000;
-  int controlFreqInHz = 50;  // Hz
-  int cycleTimeInMs = 1000 / controlFreqInHz;
-  int outOfControlBoundsTimeLimit = 10 * cycleTimeInMs;    // 10 cycles
-  int withinControlBoundsTimeReqmt = 100 * cycleTimeInMs;  // 100 cycles
-  int elapsedTimeInMs = 0;
-  int withinBoundsCounter = 0;
-  int outOfBounds = 0;
-  int brakeCounter = 0;
-  int speedFactor = 2;
+  // int timeoutInMilSec              = 10000;
+  int controlFreqInHz              = 50; // Hz
+  int cycleTimeInMs                = 1000 / controlFreqInHz;
+  int outOfControlBoundsTimeLimit  = 10 * cycleTimeInMs;  // 10 cycles
+  int withinControlBoundsTimeReqmt = 100 * cycleTimeInMs; // 100 cycles
+  int elapsedTimeInMs              = 0;
+  int withinBoundsCounter          = 0;
+  int outOfBounds                  = 0;
+  int brakeCounter                 = 0;
+  int speedFactor                  = 2;
 
-  int pkgIndex = 0;
-  TopicName topicList[] = {TOPIC_QUATERNION, TOPIC_GPS_FUSED};
-  int numTopic = sizeof(topicList) / sizeof(topicList[0]);
-  if (!setUpSubscription(pkgIndex, controlFreqInHz, topicList, numTopic,
-                         responseTimeout)) {
+  int       pkgIndex    = 0;
+  TopicName topicList[] = { TOPIC_QUATERNION, TOPIC_GPS_FUSED };
+  int       numTopic    = sizeof(topicList) / sizeof(topicList[0]);
+  if (!setUpSubscription(
+        pkgIndex, controlFreqInHz, topicList, numTopic, responseTimeout))
+  {
     return false;
   }
 
-  /* now we need position-height broadcast to obtain the real-time altitude of the aircraft, 
-   * which is consistent with the altitude closed-loop data of flight control internal position control
-   * TO DO:the data will be replaced by new data subscription.
+  /* now we need position-height broadcast to obtain the real-time altitude of
+   * the aircraft, which is consistent with the altitude closed-loop data of
+   * flight control internal position control TO DO:the data will be replaced by
+   * new data subscription.
    */
   if (!startGlobalPositionBroadcast())
   {
@@ -204,9 +231,10 @@ bool FlightSample::moveByPositionOffset(const Vector3f& offsetDesired,
 
   //! get origin position and relative height(from home point)of aircraft.
   Telemetry::TypeMap<TOPIC_GPS_FUSED>::type originGPSPosition =
-      vehicle->subscribe->getValue<TOPIC_GPS_FUSED>();
-  Telemetry::GlobalPosition currentBroadcastGP = vehicle->broadcast->getGlobalPosition();
-  float32_t originHeightBaseHomepoint = currentBroadcastGP.height;
+    vehicle->subscribe->getValue<TOPIC_GPS_FUSED>();
+  Telemetry::GlobalPosition currentBroadcastGP =
+    vehicle->broadcast->getGlobalPosition();
+  float32_t originHeightBaseHomepoint         = currentBroadcastGP.height;
   FlightController::JoystickMode joystickMode = {
     FlightController::HorizontalLogic::HORIZONTAL_POSITION,
     FlightController::VerticalLogic::VERTICAL_POSITION,
@@ -216,17 +244,21 @@ bool FlightSample::moveByPositionOffset(const Vector3f& offsetDesired,
   };
   vehicle->flightController->setJoystickMode(joystickMode);
 
-  while (elapsedTimeInMs < timeoutInMilSec) {
+  while (elapsedTimeInMs < timeoutInMilSec)
+  {
     Telemetry::TypeMap<TOPIC_GPS_FUSED>::type currentGPSPosition =
-        vehicle->subscribe->getValue<TOPIC_GPS_FUSED>();
+      vehicle->subscribe->getValue<TOPIC_GPS_FUSED>();
     Telemetry::TypeMap<TOPIC_QUATERNION>::type currentQuaternion =
-        vehicle->subscribe->getValue<TOPIC_QUATERNION>();
+      vehicle->subscribe->getValue<TOPIC_QUATERNION>();
     currentBroadcastGP = vehicle->broadcast->getGlobalPosition();
-    float yawInRad = quaternionToEulerAngle(currentQuaternion).z;
+    float yawInRad     = quaternionToEulerAngle(currentQuaternion).z;
     //! get the vector between aircraft and origin point.
 
-    Vector3f localOffset = localOffsetFromGpsAndFusedHeightOffset(currentGPSPosition, originGPSPosition,
-                                                                  currentBroadcastGP.height, originHeightBaseHomepoint);
+    Vector3f localOffset =
+      localOffsetFromGpsAndFusedHeightOffset(currentGPSPosition,
+                                             originGPSPosition,
+                                             currentBroadcastGP.height,
+                                             originHeightBaseHomepoint);
     //! get the vector between aircraft and target point.
     Vector3f offsetRemaining = vector3FSub(offsetDesired, localOffset);
 
@@ -234,44 +266,57 @@ bool FlightSample::moveByPositionOffset(const Vector3f& offsetDesired,
     horizCommandLimit(speedFactor, positionCommand.x, positionCommand.y);
 
     FlightController::JoystickCommand joystickCommand = {
-        positionCommand.x, positionCommand.y,
-        offsetDesired.z + originHeightBaseHomepoint, yawDesiredInDeg};
+      positionCommand.x,
+      positionCommand.y,
+      offsetDesired.z + originHeightBaseHomepoint,
+      yawDesiredInDeg
+    };
 
     vehicle->flightController->setJoystickCommand(joystickCommand);
 
     vehicle->flightController->joystickAction();
 
     if (vectorNorm(offsetRemaining) < posThresholdInM &&
-        std::fabs(yawInRad / DEG2RAD - yawDesiredInDeg) < yawThresholdInDeg) {
+        std::fabs(yawInRad / DEG2RAD - yawDesiredInDeg) < yawThresholdInDeg)
+    {
       //! 1. We are within bounds; start incrementing our in-bound counter
       withinBoundsCounter += cycleTimeInMs;
-    } else {
-      if (withinBoundsCounter != 0) {
+    }
+    else
+    {
+      if (withinBoundsCounter != 0)
+      {
         //! 2. Start incrementing an out-of-bounds counter
         outOfBounds += cycleTimeInMs;
       }
     }
     //! 3. Reset withinBoundsCounter if necessary
-    if (outOfBounds > outOfControlBoundsTimeLimit) {
+    if (outOfBounds > outOfControlBoundsTimeLimit)
+    {
       withinBoundsCounter = 0;
-      outOfBounds = 0;
+      outOfBounds         = 0;
     }
     //! 4. If within bounds, set flag and break
-    if (withinBoundsCounter >= withinControlBoundsTimeReqmt) {
+    if (withinBoundsCounter >= withinControlBoundsTimeReqmt)
+    {
       break;
     }
     usleep(cycleTimeInMs * 1000);
     elapsedTimeInMs += cycleTimeInMs;
+    // cout << "elapsed" << elapsedTimeInMs << endl;
   }
 
-  while (brakeCounter < withinControlBoundsTimeReqmt) {
+  while (brakeCounter < withinControlBoundsTimeReqmt)
+  {
     //! TODO: remove emergencyBrake
-    vehicle->flightController->emergencyBrakeAction();
+    // vehicle->flightController->emergencyBrakeAction();
     usleep(cycleTimeInMs * 1000);
     brakeCounter += cycleTimeInMs;
+    // cout << "brake" << brakeCounter << endl;
   }
 
-  if (elapsedTimeInMs >= timeoutInMilSec) {
+  if (elapsedTimeInMs >= timeoutInMilSec)
+  {
     std::cout << "Task timeout!\n";
     teardownSubscription(pkgIndex);
     return false;
@@ -280,51 +325,67 @@ bool FlightSample::moveByPositionOffset(const Vector3f& offsetDesired,
   return true;
 }
 
-bool FlightSample::goHomeAndConfirmLanding(int timeout) {
+bool
+FlightSample::goHomeAndConfirmLanding(int timeout)
+{
   /*! Step 1: Verify and setup the subscription */
-  const int pkgIndex = 0;
-  int freq = 10;
-  TopicName topicList[] = {TOPIC_STATUS_FLIGHT, TOPIC_STATUS_DISPLAYMODE,
-                           TOPIC_AVOID_DATA, TOPIC_VELOCITY};
-  int topicSize = sizeof(topicList) / sizeof(topicList[0]);
+  const int pkgIndex    = 0;
+  int       freq        = 10;
+  TopicName topicList[] = { TOPIC_STATUS_FLIGHT,
+                            TOPIC_STATUS_DISPLAYMODE,
+                            TOPIC_AVOID_DATA,
+                            TOPIC_VELOCITY };
+  int       topicSize   = sizeof(topicList) / sizeof(topicList[0]);
   setUpSubscription(pkgIndex, freq, topicList, topicSize, timeout);
 
   /*! Step 2: Start go home */
   DSTATUS("Start go home action");
   ErrorCode::ErrorCodeType goHomeAck =
-      vehicle->flightController->startGoHomeSync(timeout);
-  if (goHomeAck != ErrorCode::SysCommonErr::Success) {
+    vehicle->flightController->startGoHomeSync(timeout);
+    // vehicle->flightController->startGoHomeAsync();
+  if (goHomeAck != ErrorCode::SysCommonErr::Success)
+  {
     DERROR("Fail to execute go home action!  Error code: %llx\n", goHomeAck);
     return false;
   }
-  if (!checkActionStarted(VehicleStatus::DisplayMode::MODE_NAVI_GO_HOME)) {
+  if (!checkActionStarted(VehicleStatus::DisplayMode::MODE_AUTO_LANDING))
+  {
     return false;
-  } else {
+  }
+  else
+  {
     while (vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() ==
-               VehicleStatus::DisplayMode::MODE_NAVI_GO_HOME &&
+             VehicleStatus::DisplayMode::MODE_NAVI_GO_HOME &&
            vehicle->subscribe->getValue<TOPIC_STATUS_FLIGHT>() ==
-               VehicleStatus::FlightStatus::IN_AIR) {
+             VehicleStatus::FlightStatus::IN_AIR)
+    {
+      DSTATUS("In while");
       Platform::instance().taskSleepMs(
-          1000);  // waiting for this action finished
+        1000); // waiting for this action finished
     }
   }
   DSTATUS("Finished go home action");
 
   /*! Step 3: Start landing */
   DSTATUS("Start landing action");
-  if (!checkActionStarted(VehicleStatus::DisplayMode::MODE_AUTO_LANDING)) {
+  if (!checkActionStarted(VehicleStatus::DisplayMode::MODE_AUTO_LANDING))
+  {
     DERROR("Fail to execute Landing action!");
     return false;
-  } else {
+  }
+  else
+  {
     while (vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() ==
-               VehicleStatus::DisplayMode::MODE_AUTO_LANDING &&
+             VehicleStatus::DisplayMode::MODE_AUTO_LANDING &&
            vehicle->subscribe->getValue<TOPIC_STATUS_FLIGHT>() ==
-               VehicleStatus::FlightStatus::IN_AIR) {
+             VehicleStatus::FlightStatus::IN_AIR)
+    {
       Telemetry::TypeMap<TOPIC_AVOID_DATA>::type avoidData =
-          vehicle->subscribe->getValue<TOPIC_AVOID_DATA>();
+        vehicle->subscribe->getValue<TOPIC_AVOID_DATA>();
       Platform::instance().taskSleepMs(1000);
       if ((0.65 < avoidData.down && avoidData.down < 0.75) &&
-          (avoidData.downHealth == 1)) {
+          (avoidData.downHealth == 1))
+      {
         break;
       }
     }
@@ -334,21 +395,25 @@ bool FlightSample::goHomeAndConfirmLanding(int timeout) {
   /*! Step 4: Confirm Landing */
   DSTATUS("Start confirm Landing and avoid ground action");
   ErrorCode::ErrorCodeType forceLandingAvoidGroundAck =
-      vehicle->flightController->startConfirmLandingSync(timeout);
-  if (forceLandingAvoidGroundAck != ErrorCode::SysCommonErr::Success) {
-    DERROR(
-        "Fail to execute confirm landing avoid ground action! Error code: "
-        "%llx\n ",
-        forceLandingAvoidGroundAck);
+    vehicle->flightController->startConfirmLandingSync(timeout);
+  if (forceLandingAvoidGroundAck != ErrorCode::SysCommonErr::Success)
+  {
+    DERROR("Fail to execute confirm landing avoid ground action! Error code: "
+           "%llx\n ",
+           forceLandingAvoidGroundAck);
     return false;
   }
-  if (!checkActionStarted(VehicleStatus::DisplayMode::MODE_AUTO_LANDING)) {
+  if (!checkActionStarted(VehicleStatus::DisplayMode::MODE_AUTO_LANDING))
+  {
     return false;
-  } else {
+  }
+  else
+  {
     while (vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() ==
-               VehicleStatus::DisplayMode::MODE_AUTO_LANDING &&
+             VehicleStatus::DisplayMode::MODE_AUTO_LANDING &&
            vehicle->subscribe->getValue<TOPIC_STATUS_FLIGHT>() ==
-               VehicleStatus::FlightStatus::IN_AIR) {
+             VehicleStatus::FlightStatus::IN_AIR)
+    {
       Platform::instance().taskSleepMs(1000);
     }
   }
@@ -356,14 +421,16 @@ bool FlightSample::goHomeAndConfirmLanding(int timeout) {
 
   /*! Step 5: Landing finished check*/
   if (vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() !=
-          VehicleStatus::DisplayMode::MODE_P_GPS ||
+        VehicleStatus::DisplayMode::MODE_P_GPS ||
       vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() !=
-          VehicleStatus::DisplayMode::MODE_ATTITUDE) {
+        VehicleStatus::DisplayMode::MODE_ATTITUDE)
+  {
     DSTATUS("Successful landing!");
-  } else {
-    DERROR(
-        "Landing finished, but the aircraft is in an unexpected mode. "
-        "Please connect DJI Assistant.");
+  }
+  else
+  {
+    DERROR("Landing finished, but the aircraft is in an unexpected mode. "
+           "Please connect DJI Assistant.");
     teardownSubscription(pkgIndex, timeout);
     return false;
   }
@@ -372,59 +439,72 @@ bool FlightSample::goHomeAndConfirmLanding(int timeout) {
   return true;
 }
 
-bool FlightSample::setUpSubscription(int pkgIndex, int freq,
-                                     TopicName topicList[], uint8_t topicSize,
-                                     int timeout) {
-  if (vehicle) {
+bool
+FlightSample::setUpSubscription(int       pkgIndex,
+                                int       freq,
+                                TopicName topicList[],
+                                uint8_t   topicSize,
+                                int       timeout)
+{
+  if (vehicle)
+  {
     /*! Telemetry: Verify the subscription*/
     ACK::ErrorCode subscribeStatus;
     subscribeStatus = vehicle->subscribe->verify(timeout);
-    if (ACK::getError(subscribeStatus) != ACK::SUCCESS) {
+    if (ACK::getError(subscribeStatus) != ACK::SUCCESS)
+    {
       ACK::getErrorCodeMessage(subscribeStatus, __func__);
       return false;
     }
 
     bool enableTimestamp = false;
-    bool pkgStatus = vehicle->subscribe->initPackageFromTopicList(
-        pkgIndex, topicSize, topicList, enableTimestamp, freq);
-    if (!(pkgStatus)) {
+    bool pkgStatus       = vehicle->subscribe->initPackageFromTopicList(
+      pkgIndex, topicSize, topicList, enableTimestamp, freq);
+    if (!(pkgStatus))
+    {
       return pkgStatus;
     }
 
     /*! Start listening to the telemetry data */
     subscribeStatus = vehicle->subscribe->startPackage(pkgIndex, timeout);
-    if (ACK::getError(subscribeStatus) != ACK::SUCCESS) {
+    if (ACK::getError(subscribeStatus) != ACK::SUCCESS)
+    {
       ACK::getErrorCodeMessage(subscribeStatus, __func__);
       /*! Cleanup*/
       ACK::ErrorCode ack = vehicle->subscribe->removePackage(pkgIndex, timeout);
-      if (ACK::getError(ack)) {
-        DERROR(
-            "Error unsubscription; please restart the drone/FC to get "
-            "back to a clean state");
+      if (ACK::getError(ack))
+      {
+        DERROR("Error unsubscription; please restart the drone/FC to get "
+               "back to a clean state");
       }
       return false;
     }
     return true;
-  } else {
+  }
+  else
+  {
     DERROR("vehicle haven't been initialized", __func__);
     return false;
   }
 }
 
-bool FlightSample::teardownSubscription(const int pkgIndex, int timeout) {
+bool
+FlightSample::teardownSubscription(const int pkgIndex, int timeout)
+{
   ACK::ErrorCode ack = vehicle->subscribe->removePackage(pkgIndex, timeout);
-  if (ACK::getError(ack)) {
-    DERROR(
-        "Error unsubscription; please restart the drone/FC to get back "
-        "to a clean state.");
+  if (ACK::getError(ack))
+  {
+    DERROR("Error unsubscription; please restart the drone/FC to get back "
+           "to a clean state.");
     return false;
   }
   return true;
 }
 
-bool FlightSample::startGlobalPositionBroadcast(void)
+bool
+FlightSample::startGlobalPositionBroadcast(void)
 {
-   uint8_t freq[16];
+  uint8_t freq[16];
 
   /* Channels definition for A3/N3/M600
    * 0 - Timestamp
@@ -442,15 +522,16 @@ bool FlightSample::startGlobalPositionBroadcast(void)
    * 12 - Battery Level
    * 13 - Control Information
    */
-  freq[0]  = DataBroadcast::FREQ_HOLD;
-  freq[1]  = DataBroadcast::FREQ_HOLD;
-  freq[2]  = DataBroadcast::FREQ_HOLD;
-  freq[3]  = DataBroadcast::FREQ_HOLD;
-  freq[4]  = DataBroadcast::FREQ_HOLD;
-  /* We need this data to obtain the real-time altitude of the aircraft, 
-   * which is consistent with the altitude closed-loop data of flight control internal position control
+  freq[0] = DataBroadcast::FREQ_HOLD;
+  freq[1] = DataBroadcast::FREQ_HOLD;
+  freq[2] = DataBroadcast::FREQ_HOLD;
+  freq[3] = DataBroadcast::FREQ_HOLD;
+  freq[4] = DataBroadcast::FREQ_HOLD;
+  /* We need this data to obtain the real-time altitude of the aircraft,
+   * which is consistent with the altitude closed-loop data of flight control
+   * internal position control
    */
-  freq[5]  = DataBroadcast::FREQ_50HZ; 
+  freq[5]  = DataBroadcast::FREQ_50HZ;
   freq[6]  = DataBroadcast::FREQ_HOLD;
   freq[7]  = DataBroadcast::FREQ_HOLD;
   freq[8]  = DataBroadcast::FREQ_HOLD;
@@ -472,48 +553,61 @@ bool FlightSample::startGlobalPositionBroadcast(void)
   }
 }
 
-bool FlightSample::checkActionStarted(uint8_t mode) {
+bool
+FlightSample::checkActionStarted(uint8_t mode)
+{
   int actionNotStarted = 0;
-  int timeoutCycles = 20;
+  int timeoutCycles    = 20;
   while (vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() != mode &&
-         actionNotStarted < timeoutCycles) {
+         actionNotStarted < timeoutCycles)
+  {
     actionNotStarted++;
     Platform::instance().taskSleepMs(100);
   }
-  if (actionNotStarted == timeoutCycles) {
-    DERROR("Start actions mode %d failed, current DISPLAYMODE is: %d ...", mode,
+  if (actionNotStarted == timeoutCycles)
+  {
+    DERROR("Start actions mode %d failed, current DISPLAYMODE is: %d ...",
+           mode,
            vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>());
     return false;
-  } else {
+  }
+  else
+  {
     DSTATUS("DISPLAYMODE: %d ...", mode);
     return true;
   }
 }
 
-bool FlightSample::getHomeLocation(HomeLocationSetStatus& homeLocationSetStatus,
-                                   HomeLocationData& homeLocationInfo,
-                                   int responseTimeout) {
+bool
+FlightSample::getHomeLocation(HomeLocationSetStatus& homeLocationSetStatus,
+                              HomeLocationData&      homeLocationInfo,
+                              int                    responseTimeout)
+{
   ACK::ErrorCode subscribeStatus;
   subscribeStatus = vehicle->subscribe->verify(responseTimeout);
-  if (ACK::getError(subscribeStatus) != ACK::SUCCESS) {
+  if (ACK::getError(subscribeStatus) != ACK::SUCCESS)
+  {
     ACK::getErrorCodeMessage(subscribeStatus, __func__);
     return false;
   }
-  int pkgIndex = 0;
-  int freq = 1;
-  TopicName topicList[] = {TOPIC_HOME_POINT_SET_STATUS, TOPIC_HOME_POINT_INFO};
+  int       pkgIndex    = 0;
+  int       freq        = 1;
+  TopicName topicList[] = { TOPIC_HOME_POINT_SET_STATUS,
+                            TOPIC_HOME_POINT_INFO };
 
-  int numTopic = sizeof(topicList) / sizeof(topicList[0]);
+  int  numTopic        = sizeof(topicList) / sizeof(topicList[0]);
   bool enableTimestamp = false;
 
   bool pkgStatus = vehicle->subscribe->initPackageFromTopicList(
-      pkgIndex, numTopic, topicList, enableTimestamp, freq);
+    pkgIndex, numTopic, topicList, enableTimestamp, freq);
 
-  if (!(pkgStatus)) {
+  if (!(pkgStatus))
+  {
     return pkgStatus;
   }
   subscribeStatus = vehicle->subscribe->startPackage(pkgIndex, responseTimeout);
-  if (ACK::getError(subscribeStatus) != ACK::SUCCESS) {
+  if (ACK::getError(subscribeStatus) != ACK::SUCCESS)
+  {
     ACK::getErrorCodeMessage(subscribeStatus, __func__);
     /*! Cleanup before return */
     vehicle->subscribe->removePackage(pkgIndex, responseTimeout);
@@ -522,85 +616,106 @@ bool FlightSample::getHomeLocation(HomeLocationSetStatus& homeLocationSetStatus,
   /*! Wait for the data to start coming in.*/
   Platform::instance().taskSleepMs(2000);
   homeLocationSetStatus =
-      vehicle->subscribe->getValue<TOPIC_HOME_POINT_SET_STATUS>();
+    vehicle->subscribe->getValue<TOPIC_HOME_POINT_SET_STATUS>();
   homeLocationInfo = vehicle->subscribe->getValue<TOPIC_HOME_POINT_INFO>();
   ACK::ErrorCode ack =
-      vehicle->subscribe->removePackage(pkgIndex, responseTimeout);
-  if (ACK::getError(ack)) {
-    DERROR(
-        "Error unsubscription; please restart the drone/FC to get back "
-        "to a clean state.");
+    vehicle->subscribe->removePackage(pkgIndex, responseTimeout);
+  if (ACK::getError(ack))
+  {
+    DERROR("Error unsubscription; please restart the drone/FC to get back "
+           "to a clean state.");
   }
   return true;
 }
 
-ErrorCode::ErrorCodeType FlightSample::setGoHomeAltitude(
-    FlightController::GoHomeHeight altitude, int timeout) {
+ErrorCode::ErrorCodeType
+FlightSample::setGoHomeAltitude(FlightController::GoHomeHeight altitude,
+                                int                            timeout)
+{
   ErrorCode::ErrorCodeType ret =
-      vehicle->flightController->setGoHomeAltitudeSync(altitude, timeout);
-  if (ret != ErrorCode::SysCommonErr::Success) {
+    vehicle->flightController->setGoHomeAltitudeSync(altitude, timeout);
+  if (ret != ErrorCode::SysCommonErr::Success)
+  {
     DSTATUS("Set go home altitude failed, ErrorCode is:%8x", ret);
-  } else {
+  }
+  else
+  {
     DSTATUS("Set go home altitude successfully,altitude is: %d", altitude);
   }
   return ret;
 }
 
-ErrorCode::ErrorCodeType FlightSample::setNewHomeLocation(int timeout) {
-  HomeLocationSetStatus homeLocationSetStatus;
-  HomeLocationData originHomeLocation;
+ErrorCode::ErrorCodeType
+FlightSample::setNewHomeLocation(int timeout)
+{
+  HomeLocationSetStatus    homeLocationSetStatus;
+  HomeLocationData         originHomeLocation;
   ErrorCode::ErrorCodeType ret =
-      ErrorCode::FlightControllerErr::SetHomeLocationErr::Fail;
+    ErrorCode::FlightControllerErr::SetHomeLocationErr::Fail;
   bool retCode =
-      getHomeLocation(homeLocationSetStatus, originHomeLocation, timeout);
-  if (retCode && (homeLocationSetStatus.status == 1)) {
+    getHomeLocation(homeLocationSetStatus, originHomeLocation, timeout);
+  if (retCode && (homeLocationSetStatus.status == 1))
+  {
     ret = vehicle->flightController
-              ->setHomeLocationUsingCurrentAircraftLocationSync(timeout);
-    if (ret != ErrorCode::SysCommonErr::Success) {
+            ->setHomeLocationUsingCurrentAircraftLocationSync(timeout);
+    if (ret != ErrorCode::SysCommonErr::Success)
+    {
       DSTATUS("Set new home location failed, ErrorCode is:%8x", ret);
-    } else {
+    }
+    else
+    {
       DSTATUS("Set new home location successfully");
+      
     }
   }
   return ret;
 }
 
-void FlightSample::horizCommandLimit(float speedFactor, float& commandX,
-                                     float& commandY) {
+void
+FlightSample::horizCommandLimit(float  speedFactor,
+                                float& commandX,
+                                float& commandY)
+{
   if (fabs(commandX) > speedFactor)
     commandX = signOfData<float>(commandX) * speedFactor;
   if (fabs(commandY) > speedFactor)
     commandY = signOfData<float>(commandY) * speedFactor;
 }
 
-Vector3f FlightSample::quaternionToEulerAngle(
-    const Telemetry::Quaternion& quat) {
+Vector3f
+FlightSample::quaternionToEulerAngle(const Telemetry::Quaternion& quat)
+{
   Telemetry::Vector3f eulerAngle;
-  double q2sqr = quat.q2 * quat.q2;
-  double t0 = -2.0 * (q2sqr + quat.q3 * quat.q3) + 1.0;
-  double t1 = 2.0 * (quat.q1 * quat.q2 + quat.q0 * quat.q3);
-  double t2 = -2.0 * (quat.q1 * quat.q3 - quat.q0 * quat.q2);
-  double t3 = 2.0 * (quat.q2 * quat.q3 + quat.q0 * quat.q1);
-  double t4 = -2.0 * (quat.q1 * quat.q1 + q2sqr) + 1.0;
-  t2 = (t2 > 1.0) ? 1.0 : t2;
-  t2 = (t2 < -1.0) ? -1.0 : t2;
-  eulerAngle.x = asin(t2);
-  eulerAngle.y = atan2(t3, t4);
-  eulerAngle.z = atan2(t1, t0);
+  double              q2sqr = quat.q2 * quat.q2;
+  double              t0    = -2.0 * (q2sqr + quat.q3 * quat.q3) + 1.0;
+  double              t1    = 2.0 * (quat.q1 * quat.q2 + quat.q0 * quat.q3);
+  double              t2    = -2.0 * (quat.q1 * quat.q3 - quat.q0 * quat.q2);
+  double              t3    = 2.0 * (quat.q2 * quat.q3 + quat.q0 * quat.q1);
+  double              t4    = -2.0 * (quat.q1 * quat.q1 + q2sqr) + 1.0;
+  t2                        = (t2 > 1.0) ? 1.0 : t2;
+  t2                        = (t2 < -1.0) ? -1.0 : t2;
+  eulerAngle.x              = asin(t2);
+  eulerAngle.y              = atan2(t3, t4);
+  eulerAngle.z              = atan2(t1, t0);
   return eulerAngle;
 }
 
-template <typename Type>
-int FlightSample::signOfData(Type type) {
+template<typename Type>
+int
+FlightSample::signOfData(Type type)
+{
   return type < 0 ? -1 : 1;
 }
 
-float32_t FlightSample::vectorNorm(Vector3f v) {
+float32_t
+FlightSample::vectorNorm(Vector3f v)
+{
   return sqrt(pow(v.x, 2) + pow(v.y, 2) + pow(v.z, 2));
 }
 
-Vector3f FlightSample::vector3FSub(const Vector3f& vectorA,
-                                   const Vector3f& vectorB) {
+Vector3f
+FlightSample::vector3FSub(const Vector3f& vectorA, const Vector3f& vectorB)
+{
   Telemetry::Vector3f result;
   result.x = vectorA.x - vectorB.x;
   result.y = vectorA.y - vectorB.y;
@@ -608,42 +723,52 @@ Vector3f FlightSample::vector3FSub(const Vector3f& vectorA,
   return result;
 }
 
-Vector3f FlightSample::localOffsetFromGpsAndFusedHeightOffset(
-    const Telemetry::GPSFused& target, const Telemetry::GPSFused& origin,
-    const float32_t& targetHeight, const float32_t& originHeight) {
+Vector3f
+FlightSample::localOffsetFromGpsAndFusedHeightOffset(
+  const Telemetry::GPSFused& target,
+  const Telemetry::GPSFused& origin,
+  const float32_t&           targetHeight,
+  const float32_t&           originHeight)
+{
   Telemetry::Vector3f deltaNed;
-  double deltaLon = target.longitude - origin.longitude;
-  double deltaLat = target.latitude - origin.latitude;
-  deltaNed.x = deltaLat * EarthCenter;
-  deltaNed.y = deltaLon * EarthCenter * cos(target.latitude);
-  deltaNed.z = targetHeight - originHeight;
+  double              deltaLon = target.longitude - origin.longitude;
+  double              deltaLat = target.latitude - origin.latitude;
+  deltaNed.x                   = deltaLat * EarthCenter;
+  deltaNed.y                   = deltaLon * EarthCenter * cos(target.latitude);
+  deltaNed.z                   = targetHeight - originHeight;
   return deltaNed;
 }
 
-bool FlightSample::motorStartedCheck() {
+bool
+FlightSample::motorStartedCheck()
+{
   int motorsNotStarted = 0;
-  int timeoutCycles = 20;
+  int timeoutCycles    = 20;
   while (vehicle->subscribe->getValue<TOPIC_STATUS_FLIGHT>() !=
-             VehicleStatus::FlightStatus::ON_GROUND &&
+           VehicleStatus::FlightStatus::ON_GROUND &&
          vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() !=
-             VehicleStatus::DisplayMode::MODE_ENGINE_START &&
-         motorsNotStarted < timeoutCycles) {
+           VehicleStatus::DisplayMode::MODE_ENGINE_START &&
+         motorsNotStarted < timeoutCycles)
+  {
     motorsNotStarted++;
     usleep(100000);
   }
   return motorsNotStarted != timeoutCycles ? true : false;
 }
 
-bool FlightSample::takeOffInAirCheck() {
+bool
+FlightSample::takeOffInAirCheck()
+{
   int stillOnGround = 0;
   int timeoutCycles = 110;
   while (vehicle->subscribe->getValue<TOPIC_STATUS_FLIGHT>() !=
-             VehicleStatus::FlightStatus::IN_AIR &&
+           VehicleStatus::FlightStatus::IN_AIR &&
          (vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() !=
-              VehicleStatus::DisplayMode::MODE_ASSISTED_TAKEOFF ||
+            VehicleStatus::DisplayMode::MODE_ASSISTED_TAKEOFF ||
           vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() !=
-              VehicleStatus::DisplayMode::MODE_AUTO_TAKEOFF) &&
-         stillOnGround < timeoutCycles) {
+            VehicleStatus::DisplayMode::MODE_AUTO_TAKEOFF) &&
+         stillOnGround < timeoutCycles)
+  {
     stillOnGround++;
     usleep(100000);
   }
@@ -651,34 +776,39 @@ bool FlightSample::takeOffInAirCheck() {
   return stillOnGround != timeoutCycles ? true : false;
 }
 
-bool FlightSample::takeoffFinishedCheck() {
+bool
+FlightSample::takeoffFinishedCheck()
+{
   while (vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() ==
-             VehicleStatus::DisplayMode::MODE_ASSISTED_TAKEOFF ||
+           VehicleStatus::DisplayMode::MODE_ASSISTED_TAKEOFF ||
          vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() ==
-             VehicleStatus::DisplayMode::MODE_AUTO_TAKEOFF) {
+           VehicleStatus::DisplayMode::MODE_AUTO_TAKEOFF)
+  {
     sleep(1);
   }
   return ((vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() ==
            VehicleStatus::DisplayMode::MODE_P_GPS) ||
           (vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() ==
            VehicleStatus::DisplayMode::MODE_ATTITUDE))
-             ? true
-             : false;
+           ? true
+           : false;
 }
 
- bool FlightSample::landFinishedCheck(void)
- {
-    while(vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() ==
-               VehicleStatus::DisplayMode::MODE_AUTO_LANDING &&
-           vehicle->subscribe->getValue<TOPIC_STATUS_FLIGHT>() ==
-               VehicleStatus::FlightStatus::IN_AIR)
-   {
-      Platform::instance().taskSleepMs(1000);
-   }
+bool
+FlightSample::landFinishedCheck(void)
+{
+  while (vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() ==
+           VehicleStatus::DisplayMode::MODE_AUTO_LANDING &&
+         vehicle->subscribe->getValue<TOPIC_STATUS_FLIGHT>() ==
+           VehicleStatus::FlightStatus::IN_AIR)
+  {
+    Platform::instance().taskSleepMs(1000);
+  }
 
-   return ((vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() !=
-           VehicleStatus::DisplayMode::MODE_P_GPS ||
+  return ((vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() !=
+             VehicleStatus::DisplayMode::MODE_P_GPS ||
            vehicle->subscribe->getValue<TOPIC_STATUS_DISPLAYMODE>() !=
-           VehicleStatus::DisplayMode::MODE_ATTITUDE)) ? true:false;
- }
-
+             VehicleStatus::DisplayMode::MODE_ATTITUDE))
+           ? true
+           : false;
+}

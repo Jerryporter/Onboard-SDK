@@ -36,4 +36,14 @@ FILE(GLOB SOURCE_FILES *.hpp *.cpp
         ${LINKER_HEADER_SRC}
         )
 
+
+set(Boost_USE_STATIC_LIBS        ON) # only find static libs
+set(Boost_USE_MULTITHREADED      ON)
+set(Boost_USE_STATIC_RUNTIME    OFF)
+find_package(boost COMPONENTS date_time filesystem system ...)
+if(Boost_FOUND)
+  include_directories(${Boost_INCLUDE_DIRS})
+  target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
+endif()
+
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})

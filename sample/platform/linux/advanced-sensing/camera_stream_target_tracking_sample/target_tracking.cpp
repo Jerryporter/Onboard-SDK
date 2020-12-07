@@ -86,6 +86,7 @@ int main(int argc, char **argv) {
             break; // Quit if ESC is pressed
         }
 
+        char x='g';
         tu.getKey(c); //Internal states will be updated based on key pressed.
 
         if (vehicle->advancedSensing->newMainCameraImageReady()) {
@@ -109,7 +110,8 @@ int main(int argc, char **argv) {
                 case TrackingUtility::STATE_INIT:
                     cout << "g pressed, initialize tracker" << endl;
                     sprintf(message2, "g pressed, initialize tracker");
-                    roi = tu.getROI();
+                    // roi = tu.getROI();
+                    roi=Rect(cv::Point(200,300),cv::Point(600,700));
                     tracker = new KCFTracker(true, true, false, false);
                     tracker->init(roi, frame);
                     tu.startTracker();

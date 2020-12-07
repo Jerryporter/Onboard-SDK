@@ -103,21 +103,22 @@ int main(int argc, char **argv)
     flightSample->moveByPositionOffset((FlightSample::Vector3f){0, 0, 3}, 0, 0.8, 1);
 
     /*! Move a short distance*/
-    flightSample->moveByPositionOffset((FlightSample::Vector3f){10, 0, 0}, 0, 0.8, 1);
+    flightSample->moveByPositionOffset((FlightSample::Vector3f){3, 0, 0}, 0, 0.8, 1);
 
-    /*! Set aircraft current position as new home location */
-    flightSample->setNewHomeLocation();
+    // /*! Set aircraft current position as new home location */
+    // flightSample->setNewHomeLocation();
 
-    /*! Set new go home altitude */
-    flightSample->setGoHomeAltitude(50);
+    // /*! Set new go home altitude */
+    // flightSample->setGoHomeAltitude(4);
 
     /*! Move to another position */
-    flightSample->moveByPositionOffset((FlightSample::Vector3f){20, 0, 0}, 0, 0.8, 1);
+    flightSample->moveByPositionOffset((FlightSample::Vector3f){4, 0, 0}, 0, 0.8, 1);
 
     vehicle->flightController->setCollisionAvoidanceEnabledSync(
         FlightController::AvoidEnable::AVOID_DISABLE, 1);
     /*! go home and confirm landing */
     flightSample->goHomeAndConfirmLanding();
+    vehicle->flightController->startForceLandingSync(10000);
 
     vehicle->flightController->setCollisionAvoidanceEnabledSync(
         FlightController::AvoidEnable::AVOID_ENABLE, 1);

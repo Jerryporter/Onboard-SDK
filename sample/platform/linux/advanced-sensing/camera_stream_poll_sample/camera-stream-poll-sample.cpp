@@ -52,10 +52,7 @@
 
 #include "base64.h"
 #include "json.hpp"
-// #include "rapidjson/document.h"
-// #include "rapidjson/rapidjson.h"
-// #include "rapidjson/stringbuffer.h"
-// #include "rapidjson/writer.h"
+
 #include <iostream>
 #include <string>
 #include <vector>

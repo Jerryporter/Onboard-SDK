@@ -18,7 +18,7 @@ public:
             roi(0,0,0,0),
             mouseClicked(false),
             roiSelected(false),
-            state(STATE_IDLE)
+            state(STATE_INIT)
   {
   }
 

@@ -490,7 +490,7 @@ moveByPositionOffset(Vehicle *vehicle, float xOffsetDesired,
     yOffsetRemaining = yOffsetDesired - localOffset.y;
     zOffsetRemaining = zOffsetDesired - localOffset.z;
 
-    //! See if we need to modify the setpoint
+    //! See if we need to modify the setpointposThresholdInM
     if (std::abs(xOffsetRemaining) < speedFactor)
     {
       xCmd = xOffsetRemaining;

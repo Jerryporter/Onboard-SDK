@@ -27,143 +27,204 @@
  */
 
 #include "dji_flight_assistant_module.hpp"
-#include <dji_vehicle.hpp>
 #include "dji_flight_link.hpp"
+#include <dji_vehicle.hpp>
 
+#include <iostream>
 using namespace DJI;
 using namespace DJI::OSDK;
 
-FlightAssistant::FlightAssistant(Vehicle* vehicle) {
+FlightAssistant::FlightAssistant(Vehicle* vehicle)
+{
   flightLink = new FlightLink(vehicle);
 }
 
-FlightAssistant::~FlightAssistant() { delete this->flightLink; }
+FlightAssistant::~FlightAssistant()
+{
+  delete this->flightLink;
+}
 
-ErrorCode::ErrorCodeType FlightAssistant::writeParameterByHashSync(
-    uint32_t hashValue, void* data, uint8_t len, int timeout) {
-  ParameterData param = {0};
-  param.hashValue = hashValue;
+ErrorCode::ErrorCodeType
+FlightAssistant::writeParameterByHashSync(uint32_t hashValue,
+                                          void*    data,
+                                          uint8_t  len,
+                                          int      timeout)
+{
+  ParameterData param = { 0 };
+  param.hashValue     = hashValue;
   memcpy(param.paramValue, data, len);
 
   ACK::ParamAck rsp = *(ACK::ParamAck*)flightLink->sendSync(
-      OpenProtocolCMD::CMDSet::Control::parameterWrite, &param,
-      sizeof(param.hashValue) + len, timeout);
+    OpenProtocolCMD::CMDSet::Control::parameterWrite,
+    &param,
+    sizeof(param.hashValue) + len,
+    timeout);
 
   if (rsp.updated && (hashValue == rsp.data.hashValue) &&
       (!memcmp((void*)rsp.data.paramValue, data, len)) &&
       (rsp.info.len - OpenProtocol::PackageMin <=
-       sizeof(ACK::ParamAckInternal))) {
+       sizeof(ACK::ParamAckInternal)))
+  {
     return ErrorCode::SysCommonErr::Success;
-  } else {
+  }
+  else
+  {
     if (!rsp.updated)
       return ErrorCode::SysCommonErr::ReqTimeout;
     else if (hashValue != rsp.data.hashValue ||
              !memcmp((void*)rsp.data.paramValue, data, len))
       return ErrorCode::FlightControllerErr::ParamReadWriteErr::
-          InvalidParameter;
+        InvalidParameter;
     else
       return ErrorCode::SysCommonErr::UnpackDataMismatch;
   }
 }
 
-void FlightAssistant::writeParameterByHashAsync(
-    uint32_t hashValue, void* data, uint8_t len,
-    void (*ackDecoderCB)(Vehicle* vehicle, RecvContainer recvFrame,
-                         UCBRetCodeHandler* ucb),
-    void (*userCB)(ErrorCode::ErrorCodeType retCode, UserData userData),
-    UserData userData, int timeout, int retryTime) {
-  if (flightLink) {
-    ParameterData param = {0};
-    param.hashValue = hashValue;
+void
+FlightAssistant::writeParameterByHashAsync(
+  uint32_t hashValue,
+  void*    data,
+  uint8_t  len,
+  void (*ackDecoderCB)(Vehicle*           vehicle,
+                       RecvContainer      recvFrame,
+                       UCBRetCodeHandler* ucb),
+  void (*userCB)(ErrorCode::ErrorCodeType retCode, UserData userData),
+  UserData userData,
+  int      timeout,
+  int      retryTime)
+{
+  if (flightLink)
+  {
+    ParameterData param = { 0 };
+    param.hashValue     = hashValue;
     memcpy(param.paramValue, data, len);
     flightLink->sendAsync(OpenProtocolCMD::CMDSet::Control::parameterWrite,
-                          &param, sizeof(hashValue) + len, (void*)ackDecoderCB,
-                          allocUCBHandler((void*)userCB, userData), timeout,
+                          &param,
+                          sizeof(hashValue) + len,
+                          (void*)ackDecoderCB,
+                          allocUCBHandler((void*)userCB, userData),
+                          timeout,
                           retryTime);
-  } else {
-    if (userCB) userCB(ErrorCode::SysCommonErr::AllocMemoryFailed, userData);
+  }
+  else
+  {
+    if (userCB)
+      userCB(ErrorCode::SysCommonErr::AllocMemoryFailed, userData);
   }
 }
 
-ErrorCode::ErrorCodeType FlightAssistant::readParameterByHashSync(
-    ParamHashValue hashValue, void* param, int timeout) {
+ErrorCode::ErrorCodeType
+FlightAssistant::readParameterByHashSync(ParamHashValue hashValue,
+                                         void*          param,
+                                         int            timeout)
+{
   ACK::ParamAck rsp = *(ACK::ParamAck*)flightLink->sendSync(
-      OpenProtocolCMD::CMDSet::Control::parameterRead, &hashValue,
-      sizeof(hashValue), timeout);
+    OpenProtocolCMD::CMDSet::Control::parameterRead,
+    &hashValue,
+    sizeof(hashValue),
+    timeout);
   if (rsp.updated && hashValue == rsp.data.hashValue &&
       (rsp.info.len - OpenProtocol::PackageMin <=
-       sizeof(ACK::ParamAckInternal))) {
+       sizeof(ACK::ParamAckInternal)))
+  {
     memcpy(param, rsp.data.paramValue, MAX_PARAMETER_VALUE_LENGTH);
     return ErrorCode::SysCommonErr::Success;
-  } else {
+  }
+  else
+  {
     if (!rsp.updated)
       return ErrorCode::SysCommonErr::ReqTimeout;
     else if (hashValue != rsp.data.hashValue)
       return ErrorCode::FlightControllerErr::ParamReadWriteErr::
-          InvalidParameter;
+        InvalidParameter;
     else
       return ErrorCode::SysCommonErr::UnpackDataMismatch;
   }
 }
 
-template <typename DataT>
-void FlightAssistant::readParameterByHashAsync(
-    ParamHashValue hashValue,
-    void (*ackDecoderCB)(Vehicle* vehicle, RecvContainer recvFrame,
-                         UCBRetParamHandler<DataT>* ucb),
-    void (*userCB)(ErrorCode::ErrorCodeType retCode, DataT data,
-                   UserData userData),
-    UserData userData, int timeout, int retryTime) {
-  if (flightLink) {
+template<typename DataT>
+void
+FlightAssistant::readParameterByHashAsync(
+  ParamHashValue hashValue,
+  void (*ackDecoderCB)(Vehicle*                   vehicle,
+                       RecvContainer              recvFrame,
+                       UCBRetParamHandler<DataT>* ucb),
+  void (*userCB)(ErrorCode::ErrorCodeType retCode,
+                 DataT                    data,
+                 UserData                 userData),
+  UserData userData,
+  int      timeout,
+  int      retryTime)
+{
+  if (flightLink)
+  {
     flightLink->sendAsync(OpenProtocolCMD::CMDSet::Control::parameterRead,
-                          &hashValue, sizeof(hashValue), (void*)ackDecoderCB,
-                          allocUCBHandler((void*)userCB, userData), timeout,
+                          &hashValue,
+                          sizeof(hashValue),
+                          (void*)ackDecoderCB,
+                          allocUCBHandler((void*)userCB, userData),
+                          timeout,
                           retryTime);
-  } else {
+  }
+  else
+  {
     DataT data = {};
     if (userCB)
       userCB(ErrorCode::SysCommonErr::AllocMemoryFailed, data, userData);
   }
 }
 
-FlightAssistant::UCBRetCodeHandler* FlightAssistant::allocUCBHandler(
-    void* callback, UserData userData) {
+FlightAssistant::UCBRetCodeHandler*
+FlightAssistant::allocUCBHandler(void* callback, UserData userData)
+{
   static int ucbHandlerIndex = 0;
   ucbHandlerIndex++;
-  if (ucbHandlerIndex >= maxSize) {
+  if (ucbHandlerIndex >= maxSize)
+  {
     ucbHandlerIndex = 0;
   }
   ucbHandler[ucbHandlerIndex].UserCallBack =
-      (void (*)(ErrorCode::ErrorCodeType errCode, UserData userData))callback;
+    (void (*)(ErrorCode::ErrorCodeType errCode, UserData userData))callback;
   ucbHandler[ucbHandlerIndex].userData = userData;
   return &(ucbHandler[ucbHandlerIndex]);
 }
 
-template <typename AckT>
-ErrorCode::ErrorCodeType FlightAssistant::commonDataUnpacker(
-    RecvContainer recvFrame, AckT& ack) {
-  if (recvFrame.recvInfo.len - OpenProtocol::PackageMin >= sizeof(AckT)) {
+template<typename AckT>
+ErrorCode::ErrorCodeType
+FlightAssistant::commonDataUnpacker(RecvContainer recvFrame, AckT& ack)
+{
+  if (recvFrame.recvInfo.len - OpenProtocol::PackageMin >= sizeof(AckT))
+  {
     ack = *(AckT*)(recvFrame.recvData.raw_ack_array);
     return ack.retCode;
-  } else {
+  }
+  else
+  {
     DERROR("ACK is exception, data len %d (expect >= %d)\n",
-           recvFrame.recvInfo.len - OpenProtocol::PackageMin, sizeof(AckT));
+           recvFrame.recvInfo.len - OpenProtocol::PackageMin,
+           sizeof(AckT));
     return ErrorCode::SysCommonErr::UnpackDataMismatch;
   }
 }
 
-void FlightAssistant::setParameterDecoder(Vehicle* vehicle,
-                                          RecvContainer recvFrame,
-                                          UCBRetCodeHandler* ucb) {
-  if (ucb && ucb->UserCallBack) {
-    ACK::ParamAckInternal ack = {0};
+void
+FlightAssistant::setParameterDecoder(Vehicle*           vehicle,
+                                     RecvContainer      recvFrame,
+                                     UCBRetCodeHandler* ucb)
+{
+  if (ucb && ucb->UserCallBack)
+  {
+    ACK::ParamAckInternal    ack = { 0 };
     ErrorCode::ErrorCodeType ret = 0;
     if (recvFrame.recvInfo.len - OpenProtocol::PackageMin <=
-        sizeof(ACK::ParamAckInternal)) {
+        sizeof(ACK::ParamAckInternal))
+    {
       ack = *(ACK::ParamAckInternal*)(recvFrame.recvData.raw_ack_array);
-      ret = ErrorCode::getErrorCode(ErrorCode::FCModule,
-                                    ErrorCode::FCParameterTable, ack.retCode);
-    } else {
+      ret = ErrorCode::getErrorCode(
+        ErrorCode::FCModule, ErrorCode::FCParameterTable, ack.retCode);
+    }
+    else
+    {
       DERROR("ACK is exception, data len %d (expect >= %d)\n",
              recvFrame.recvInfo.len - OpenProtocol::PackageMin,
              sizeof(ACK::ParamAckInternal));
@@ -173,265 +234,367 @@ void FlightAssistant::setParameterDecoder(Vehicle* vehicle,
   }
 }
 
-void FlightAssistant::getRtkEnableDecoder(
-    Vehicle* vehicle, RecvContainer recvFrame,
-    UCBRetParamHandler<RtkEnableData>* ucb) {
-  if (ucb && ucb->UserCallBack) {
-    RtkEnableAck ack = {0};
+void
+FlightAssistant::getRtkEnableDecoder(Vehicle*      vehicle,
+                                     RecvContainer recvFrame,
+                                     UCBRetParamHandler<RtkEnableData>* ucb)
+{
+  if (ucb && ucb->UserCallBack)
+  {
+    RtkEnableAck             ack = { 0 };
     ErrorCode::ErrorCodeType retCode =
-        commonDataUnpacker<RtkEnableAck>(recvFrame, ack);
+      commonDataUnpacker<RtkEnableAck>(recvFrame, ack);
     ucb->UserCallBack(retCode, (RtkEnableData)ack.rtkEnable, ucb->userData);
   }
 }
 
-void FlightAssistant::getAvoidEnableDecoder(
-    Vehicle* vehicle, RecvContainer recvFrame,
-    UCBRetParamHandler<AvoidEnable>* ucb) {
-  if (ucb && ucb->UserCallBack) {
-    AvoidEnableAck ack = {0};
+void
+FlightAssistant::getAvoidEnableDecoder(Vehicle*      vehicle,
+                                       RecvContainer recvFrame,
+                                       UCBRetParamHandler<AvoidEnable>* ucb)
+{
+  if (ucb && ucb->UserCallBack)
+  {
+    AvoidEnableAck           ack = { 0 };
     ErrorCode::ErrorCodeType retCode =
-        commonDataUnpacker<AvoidEnableAck>(recvFrame, ack);
+      commonDataUnpacker<AvoidEnableAck>(recvFrame, ack);
     ucb->UserCallBack(retCode, (AvoidEnable)ack.avoidEnable, ucb->userData);
   }
 }
 
-void FlightAssistant::getUpwardsAvoidEnableDecoder(
-    Vehicle* vehicle, RecvContainer recvFrame,
-    UCBRetParamHandler<UpwardsAvoidEnable>* ucb) {
-  if (ucb && ucb->UserCallBack) {
-    UpwardsAvoidEnableAck ack = {0};
+void
+FlightAssistant::getUpwardsAvoidEnableDecoder(
+  Vehicle*                                vehicle,
+  RecvContainer                           recvFrame,
+  UCBRetParamHandler<UpwardsAvoidEnable>* ucb)
+{
+  if (ucb && ucb->UserCallBack)
+  {
+    UpwardsAvoidEnableAck    ack = { 0 };
     ErrorCode::ErrorCodeType retCode =
-        commonDataUnpacker<UpwardsAvoidEnableAck>(recvFrame, ack);
-    ucb->UserCallBack(retCode, (UpwardsAvoidEnable)ack.upwardsAvoidEnable,
-                      ucb->userData);
+      commonDataUnpacker<UpwardsAvoidEnableAck>(recvFrame, ack);
+    ucb->UserCallBack(
+      retCode, (UpwardsAvoidEnable)ack.upwardsAvoidEnable, ucb->userData);
   }
 }
 
-void FlightAssistant::getGoHomeAltitudeDecoder(
-    Vehicle* vehicle, RecvContainer recvFrame,
-    UCBRetParamHandler<GoHomeAltitude>* ucb) {
-  if (ucb && ucb->UserCallBack) {
-    GoHomeAltitudeAck ack = {0};
+void
+FlightAssistant::getGoHomeAltitudeDecoder(
+  Vehicle*                            vehicle,
+  RecvContainer                       recvFrame,
+  UCBRetParamHandler<GoHomeAltitude>* ucb)
+{
+  if (ucb && ucb->UserCallBack)
+  {
+    GoHomeAltitudeAck        ack = { 0 };
     ErrorCode::ErrorCodeType retCode =
-        commonDataUnpacker<GoHomeAltitudeAck>(recvFrame, ack);
+      commonDataUnpacker<GoHomeAltitudeAck>(recvFrame, ack);
     ucb->UserCallBack(retCode, (GoHomeAltitude)ack.altitude, ucb->userData);
   }
 }
 
-void FlightAssistant::setHomePointAckDecoder(Vehicle* vehicle,
-                                             RecvContainer recvFrame,
-                                             UCBRetCodeHandler* ucb) {
-  if (ucb && ucb->UserCallBack) {
-    ACK::SetHomeLocationAckInternal ack = {0};
-    ErrorCode::ErrorCodeType ret = 0;
-    if (recvFrame.recvInfo.len - OpenProtocol::PackageMin <= sizeof(ack)) {
+void
+FlightAssistant::setHomePointAckDecoder(Vehicle*           vehicle,
+                                        RecvContainer      recvFrame,
+                                        UCBRetCodeHandler* ucb)
+{
+  if (ucb && ucb->UserCallBack)
+  {
+    ACK::SetHomeLocationAckInternal ack = { 0 };
+    ErrorCode::ErrorCodeType        ret = 0;
+    if (recvFrame.recvInfo.len - OpenProtocol::PackageMin <= sizeof(ack))
+    {
       ack.result = recvFrame.recvData.setHomeLocationACK.result;
       printf("Set home location async ret code%x\n", ack.result);
-      ret = ErrorCode::getErrorCode(ErrorCode::FCModule,
-                                    ErrorCode::FCSetHomeLocation, ack.result);
-    } else {
+      ret = ErrorCode::getErrorCode(
+        ErrorCode::FCModule, ErrorCode::FCSetHomeLocation, ack.result);
+    }
+    else
+    {
       DERROR("ACK is exception, data len %d (expect >= %d)\n",
-             recvFrame.recvInfo.len - OpenProtocol::PackageMin, sizeof(ack));
+             recvFrame.recvInfo.len - OpenProtocol::PackageMin,
+             sizeof(ack));
       ret = ErrorCode::SysCommonErr::UnpackDataMismatch;
     }
     ucb->UserCallBack(ret, ucb->userData);
   }
 }
 
-ErrorCode::ErrorCodeType FlightAssistant::setRtkEnableSync(
-    RtkEnableData rtkEnable, int timeout) {
+ErrorCode::ErrorCodeType
+FlightAssistant::setRtkEnableSync(RtkEnableData rtkEnable, int timeout)
+{
   return writeParameterByHashSync(ParamHashValue::USE_RTK_DATA,
-                                  (void*)&rtkEnable, sizeof(rtkEnable),
+                                  (void*)&rtkEnable,
+                                  sizeof(rtkEnable),
                                   timeout);
 }
 
-void FlightAssistant::setRtkEnableAsync(
-    RtkEnableData rtkEnable,
-    void (*UserCallBack)(ErrorCode::ErrorCodeType retCode, UserData userData),
-    UserData userData) {
-  writeParameterByHashAsync(ParamHashValue::USE_RTK_DATA, (void*)&rtkEnable,
-                            sizeof(rtkEnable), setParameterDecoder,
-                            UserCallBack, userData);
+void
+FlightAssistant::setRtkEnableAsync(
+  RtkEnableData rtkEnable,
+  void (*UserCallBack)(ErrorCode::ErrorCodeType retCode, UserData userData),
+  UserData userData)
+{
+  writeParameterByHashAsync(ParamHashValue::USE_RTK_DATA,
+                            (void*)&rtkEnable,
+                            sizeof(rtkEnable),
+                            setParameterDecoder,
+                            UserCallBack,
+                            userData);
 }
 
-ErrorCode::ErrorCodeType FlightAssistant::getRtkEnableSync(
-    RtkEnableData& rtkEnable, int timeout) {
-  uint8_t param[MAX_PARAMETER_VALUE_LENGTH];
+ErrorCode::ErrorCodeType
+FlightAssistant::getRtkEnableSync(RtkEnableData& rtkEnable, int timeout)
+{
+  uint8_t                  param[MAX_PARAMETER_VALUE_LENGTH];
   ErrorCode::ErrorCodeType ret =
-      readParameterByHashSync(ParamHashValue::USE_RTK_DATA, param, timeout);
-  if (ret == ErrorCode::SysCommonErr::Success) {
+    readParameterByHashSync(ParamHashValue::USE_RTK_DATA, param, timeout);
+  if (ret == ErrorCode::SysCommonErr::Success)
+  {
     rtkEnable = *(RtkEnableData*)param;
   }
   return ret;
 }
 
-void FlightAssistant::getRtkEnableAsync(
-    void (*UserCallBack)(ErrorCode::ErrorCodeType retCode,
-                         RtkEnableData rtkEnable, UserData userData),
-    UserData userData) {
-  readParameterByHashAsync<RtkEnableData>(ParamHashValue::USE_RTK_DATA,
-                                          getRtkEnableDecoder, UserCallBack,
-                                          userData);
+void
+FlightAssistant::getRtkEnableAsync(
+  void (*UserCallBack)(ErrorCode::ErrorCodeType retCode,
+                       RtkEnableData            rtkEnable,
+                       UserData                 userData),
+  UserData userData)
+{
+  readParameterByHashAsync<RtkEnableData>(
+    ParamHashValue::USE_RTK_DATA, getRtkEnableDecoder, UserCallBack, userData);
 }
 
-ErrorCode::ErrorCodeType FlightAssistant::setGoHomeAltitudeSync(
-    GoHomeAltitude altitude, int timeout) {
-  if (!goHomeAltitudeValidCheck(altitude)) {
+ErrorCode::ErrorCodeType
+FlightAssistant::setGoHomeAltitudeSync(GoHomeAltitude altitude, int timeout)
+{
+  if (!goHomeAltitudeValidCheck(altitude))
+  {
     return ErrorCode::FlightControllerErr::ParamReadWriteErr::InvalidParameter;
   }
   ErrorCode::ErrorCodeType ret =
-      writeParameterByHashSync(ParamHashValue::GO_HOME_ALTITUDE,
-                               (void*)&altitude, sizeof(altitude), timeout);
+    writeParameterByHashSync(ParamHashValue::GO_HOME_ALTITUDE,
+                             (void*)&altitude,
+                             sizeof(altitude),
+                             timeout);
   return ret;
 }
 
-void FlightAssistant::setGoHomeAltitudeAsync(
-    GoHomeAltitude altitude,
-    void (*UserCallBack)(ErrorCode::ErrorCodeType retCode, UserData userData),
-    UserData userData) {
-  if (goHomeAltitudeValidCheck(altitude)) {
+void
+FlightAssistant::setGoHomeAltitudeAsync(
+  GoHomeAltitude altitude,
+  void (*UserCallBack)(ErrorCode::ErrorCodeType retCode, UserData userData),
+  UserData userData)
+{
+  if (goHomeAltitudeValidCheck(altitude))
+  {
     writeParameterByHashAsync(ParamHashValue::GO_HOME_ALTITUDE,
-                              (void*)&altitude, sizeof(altitude),
-                              setParameterDecoder, UserCallBack, userData);
-  } else
+                              (void*)&altitude,
+                              sizeof(altitude),
+                              setParameterDecoder,
+                              UserCallBack,
+                              userData);
+  }
+  else
     UserCallBack(
-        ErrorCode::FlightControllerErr::ParamReadWriteErr::InvalidParameter,
-        userData);
+      ErrorCode::FlightControllerErr::ParamReadWriteErr::InvalidParameter,
+      userData);
 }
 
-ErrorCode::ErrorCodeType FlightAssistant::getGoHomeAltitudeSync(
-    GoHomeAltitude& altitude, int timeout) {
-  uint8_t param[MAX_PARAMETER_VALUE_LENGTH];
+ErrorCode::ErrorCodeType
+FlightAssistant::getGoHomeAltitudeSync(GoHomeAltitude& altitude, int timeout)
+{
+  uint8_t                  param[MAX_PARAMETER_VALUE_LENGTH];
   ErrorCode::ErrorCodeType ret =
-      readParameterByHashSync(ParamHashValue::GO_HOME_ALTITUDE, param, timeout);
-  if (ret == ErrorCode::SysCommonErr::Success) {
+    readParameterByHashSync(ParamHashValue::GO_HOME_ALTITUDE, param, timeout);
+  if (ret == ErrorCode::SysCommonErr::Success)
+  {
     altitude = *(GoHomeAltitude*)param;
   }
   return ret;
 }
 
-void FlightAssistant::getGoHomeAltitudeAsync(
-    void (*UserCallBack)(ErrorCode::ErrorCodeType retCode,
-                         GoHomeAltitude altitude, UserData userData),
-    UserData userData) {
+void
+FlightAssistant::getGoHomeAltitudeAsync(
+  void (*UserCallBack)(ErrorCode::ErrorCodeType retCode,
+                       GoHomeAltitude           altitude,
+                       UserData                 userData),
+  UserData userData)
+{
   readParameterByHashAsync<GoHomeAltitude>(ParamHashValue::GO_HOME_ALTITUDE,
                                            getGoHomeAltitudeDecoder,
-                                           UserCallBack, userData);
+                                           UserCallBack,
+                                           userData);
 }
 
-ErrorCode::ErrorCodeType FlightAssistant::setCollisionAvoidanceEnabledSync(
-    AvoidEnable avoidEnable, int timeout) {
+ErrorCode::ErrorCodeType
+FlightAssistant::setCollisionAvoidanceEnabledSync(AvoidEnable avoidEnable,
+                                                  int         timeout)
+{
   return writeParameterByHashSync(ParamHashValue::HORIZ_AVOID,
-                                  (void*)&avoidEnable, sizeof(avoidEnable),
+                                  (void*)&avoidEnable,
+                                  sizeof(avoidEnable),
                                   timeout);
 }
 
-void FlightAssistant::setCollisionAvoidanceEnabledAsync(
-    FlightAssistant::AvoidEnable avoidEnable,
-    void (*UserCallBack)(ErrorCode::ErrorCodeType retCode, UserData userData),
-    UserData userData) {
-  writeParameterByHashAsync(ParamHashValue::HORIZ_AVOID, (void*)&avoidEnable,
-                            sizeof(avoidEnable), setParameterDecoder,
-                            UserCallBack, userData);
+void
+FlightAssistant::setCollisionAvoidanceEnabledAsync(
+  FlightAssistant::AvoidEnable avoidEnable,
+  void (*UserCallBack)(ErrorCode::ErrorCodeType retCode, UserData userData),
+  UserData userData)
+{
+  writeParameterByHashAsync(ParamHashValue::HORIZ_AVOID,
+                            (void*)&avoidEnable,
+                            sizeof(avoidEnable),
+                            setParameterDecoder,
+                            UserCallBack,
+                            userData);
 }
 
-ErrorCode::ErrorCodeType FlightAssistant::getCollisionAvoidanceEnabledSync(
-    AvoidEnable& avoidEnable, int timeout) {
-  uint8_t param[MAX_PARAMETER_VALUE_LENGTH];
+ErrorCode::ErrorCodeType
+FlightAssistant::getCollisionAvoidanceEnabledSync(AvoidEnable& avoidEnable,
+                                                  int          timeout)
+{
+  uint8_t                  param[MAX_PARAMETER_VALUE_LENGTH];
   ErrorCode::ErrorCodeType ret =
-      readParameterByHashSync(ParamHashValue::HORIZ_AVOID, param, timeout);
-  if (ret == ErrorCode::SysCommonErr::Success) {
+    readParameterByHashSync(ParamHashValue::HORIZ_AVOID, param, timeout);
+  if (ret == ErrorCode::SysCommonErr::Success)
+  {
     avoidEnable = *(AvoidEnable*)param;
   }
   return ret;
 }
 
-void FlightAssistant::getCollisionAvoidanceEnabledAsync(
-    void (*UserCallBack)(ErrorCode::ErrorCodeType retCode,
-                         AvoidEnable avoidEnable, UserData userData),
-    UserData userData) {
-  readParameterByHashAsync<AvoidEnable>(ParamHashValue::HORIZ_AVOID,
-                                        getAvoidEnableDecoder, UserCallBack,
-                                        userData);
+void
+FlightAssistant::getCollisionAvoidanceEnabledAsync(
+  void (*UserCallBack)(ErrorCode::ErrorCodeType retCode,
+                       AvoidEnable              avoidEnable,
+                       UserData                 userData),
+  UserData userData)
+{
+  readParameterByHashAsync<AvoidEnable>(
+    ParamHashValue::HORIZ_AVOID, getAvoidEnableDecoder, UserCallBack, userData);
 }
 
-ErrorCode::ErrorCodeType FlightAssistant::setUpwardsAvoidanceEnabledSync(
-    UpwardsAvoidEnable upwardsAvoidEnable, int timeout) {
+ErrorCode::ErrorCodeType
+FlightAssistant::setUpwardsAvoidanceEnabledSync(
+  UpwardsAvoidEnable upwardsAvoidEnable,
+  int                timeout)
+{
   return writeParameterByHashSync(ParamHashValue::UPWARDS_AVOID,
                                   (void*)&upwardsAvoidEnable,
-                                  sizeof(upwardsAvoidEnable), timeout);
+                                  sizeof(upwardsAvoidEnable),
+                                  timeout);
 }
 
-void FlightAssistant::setUpwardsAvoidanceEnabledAsync(
-    UpwardsAvoidEnable upwardsAvoidEnable,
-    void (*UserCallBack)(ErrorCode::ErrorCodeType retCode, UserData userData),
-    UserData userData) {
-  writeParameterByHashAsync(
-      ParamHashValue::UPWARDS_AVOID, (void*)&upwardsAvoidEnable,
-      sizeof(upwardsAvoidEnable), setParameterDecoder, UserCallBack, userData);
+void
+FlightAssistant::setUpwardsAvoidanceEnabledAsync(
+  UpwardsAvoidEnable upwardsAvoidEnable,
+  void (*UserCallBack)(ErrorCode::ErrorCodeType retCode, UserData userData),
+  UserData userData)
+{
+  writeParameterByHashAsync(ParamHashValue::UPWARDS_AVOID,
+                            (void*)&upwardsAvoidEnable,
+                            sizeof(upwardsAvoidEnable),
+                            setParameterDecoder,
+                            UserCallBack,
+                            userData);
 }
 
-ErrorCode::ErrorCodeType FlightAssistant::getUpwardsAvoidanceEnabledSync(
-    UpwardsAvoidEnable& upwardsAvoidEnable, int timeout) {
-  uint8_t param[MAX_PARAMETER_VALUE_LENGTH];
+ErrorCode::ErrorCodeType
+FlightAssistant::getUpwardsAvoidanceEnabledSync(
+  UpwardsAvoidEnable& upwardsAvoidEnable,
+  int                 timeout)
+{
+  uint8_t                  param[MAX_PARAMETER_VALUE_LENGTH];
   ErrorCode::ErrorCodeType ret =
-      readParameterByHashSync(ParamHashValue::UPWARDS_AVOID, param, timeout);
-  if (ret == ErrorCode::SysCommonErr::Success) {
+    readParameterByHashSync(ParamHashValue::UPWARDS_AVOID, param, timeout);
+  if (ret == ErrorCode::SysCommonErr::Success)
+  {
     upwardsAvoidEnable = *(UpwardsAvoidEnable*)param;
   }
   return ret;
 }
 
-void FlightAssistant::getUpwardsAvoidanceEnabledAsync(
-    void (*UserCallBack)(ErrorCode::ErrorCodeType retCode,
-                         UpwardsAvoidEnable upwardsEnable, UserData userData),
-    UserData userData) {
+void
+FlightAssistant::getUpwardsAvoidanceEnabledAsync(
+  void (*UserCallBack)(ErrorCode::ErrorCodeType retCode,
+                       UpwardsAvoidEnable       upwardsEnable,
+                       UserData                 userData),
+  UserData userData)
+{
   readParameterByHashAsync<UpwardsAvoidEnable>(ParamHashValue::UPWARDS_AVOID,
                                                getUpwardsAvoidEnableDecoder,
-                                               UserCallBack, userData);
+                                               UserCallBack,
+                                               userData);
 }
 
-ErrorCode::ErrorCodeType FlightAssistant::setHomeLocationSync(
-    SetHomeLocationData homeLocation, int timeout) {
-  if (flightLink) {
+ErrorCode::ErrorCodeType
+FlightAssistant::setHomeLocationSync(SetHomeLocationData homeLocation,
+                                     int                 timeout)
+{
+  // std::cout << "homelocation.latitude" << homeLocation.latitude << std::endl;
+  // std::cout << "homelocation.longtitude " << homeLocation.longitude
+  //           << std::endl;
+  // std::cout << "homelocation.hometype " << homeLocation.homeType << std::endl;
+  if (flightLink)
+  {
     ACK::SetHomeLocationAck rsp =
-        *(ACK::SetHomeLocationAck*)flightLink->sendSync(
-            OpenProtocolCMD::CMDSet::Control::setHomeLocation, &homeLocation,
-            sizeof(homeLocation), timeout);
+      *(ACK::SetHomeLocationAck*)flightLink->sendSync(
+        OpenProtocolCMD::CMDSet::Control::setHomeLocation,
+        &homeLocation,
+        sizeof(homeLocation),
+        timeout);
     if ((rsp.info.len - OpenProtocol::PackageMin <=
-         sizeof(ACK::SetHomeLocationAckInternal))) {
+         sizeof(ACK::SetHomeLocationAckInternal)))
+    {
       return ErrorCode::getErrorCode(
-          ErrorCode::FCModule, ErrorCode::FCSetHomeLocation, rsp.data.retCode);
-    } else {
+        ErrorCode::FCModule, ErrorCode::FCSetHomeLocation, rsp.data.retCode);
+    }
+    else
+    {
       return ErrorCode::SysCommonErr::UnpackDataMismatch;
     }
-  } else {
+  }
+  else
+  {
     return ErrorCode::SysCommonErr::AllocMemoryFailed;
   }
 }
 
-void FlightAssistant::setHomeLocationAsync(
-    SetHomeLocationData homeLocation,
-    void (*UserCallBack)(ErrorCode::ErrorCodeType retCode, UserData userData),
-    UserData userData) {
-  if (flightLink) {
+void
+FlightAssistant::setHomeLocationAsync(
+  SetHomeLocationData homeLocation,
+  void (*UserCallBack)(ErrorCode::ErrorCodeType retCode, UserData userData),
+  UserData userData)
+{
+  if (flightLink)
+  {
     flightLink->sendAsync(OpenProtocolCMD::CMDSet::Control::setHomeLocation,
-                          &homeLocation, sizeof(homeLocation),
+                          &homeLocation,
+                          sizeof(homeLocation),
                           (void*)setHomePointAckDecoder,
                           allocUCBHandler((void*)UserCallBack, userData));
-  } else {
+  }
+  else
+  {
     if (UserCallBack)
       UserCallBack(ErrorCode::SysCommonErr::AllocMemoryFailed, userData);
   }
 }
 
-bool FlightAssistant::goHomeAltitudeValidCheck(GoHomeAltitude altitude) {
-  if (altitude < MIN_GO_HOME_HEIGHT || altitude > MAX_FLIGHT_HEIGHT) {
-    DERROR(
-        "Go home altitude is not in between MIN_GO_HOME_HEIGHT and  "
-        "MAX_FLIGHT_HEIGHT:%d\n",
-        altitude);
+bool
+FlightAssistant::goHomeAltitudeValidCheck(GoHomeAltitude altitude)
+{
+  if (altitude < MIN_GO_HOME_HEIGHT || altitude > MAX_FLIGHT_HEIGHT)
+  {
+    DERROR("Go home altitude is not in between MIN_GO_HOME_HEIGHT and  "
+           "MAX_FLIGHT_HEIGHT:%d\n",
+           altitude);
     return false;
-  } else
+  }
+  else
     return true;
 }
