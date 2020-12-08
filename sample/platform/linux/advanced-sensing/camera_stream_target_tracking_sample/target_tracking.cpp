@@ -132,11 +132,7 @@ main(int argc, char** argv)
           const char* path_img = "/home/dji/Downloads/123.png";
           imwrite(path_img, frame);
           system("bash /home/dji/Desktop/Onboard-SDK/tmp/setposition.sh");
-          posi_file.open("/tmp/position.txt");
-          // string position;
-          // posi_file >> position;
-          // cout << position;
-          // json j=json::parse(position);
+          posi_file.open("/tmp/position.json");
           json j;
           posi_file >> j;
           int x, y, weight, height;
