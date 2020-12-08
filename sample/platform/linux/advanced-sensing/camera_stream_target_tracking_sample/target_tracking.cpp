@@ -20,176 +20,236 @@
  * SOFTWARE.
  */
 
-#include "dji_vehicle.hpp"
-#include <iostream>
 #include "dji_linux_helpers.hpp"
+#include "dji_vehicle.hpp"
 #include "tracking_utility.hpp"
+#include <iostream>
 
-#include "opencv2/imgproc/imgproc.hpp"
-#include "opencv2/highgui/highgui.hpp"
 #include "KCFcpp/src/kcftracker.hpp"
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
 
-#include <cstdio>
 #include <chrono>
+#include <cstdio>
 
-#include <boost/asio.hpp>
+#include "./json.hpp"
+using json = nlohmann::json;
+//#include <boost/filesystem.hpp>
 
 typedef std::chrono::time_point<std::chrono::high_resolution_clock> timer;
-typedef std::chrono::duration<float> duration;
+typedef std::chrono::duration<float>                                duration;
 
 using namespace DJI::OSDK;
 using namespace std;
 using namespace cv;
 
-int main(int argc, char **argv) {
-    // Setup OSDK.
-    bool enableAdvancedSensing = true;
-    LinuxSetup linuxEnvironment(argc, argv, enableAdvancedSensing);
-    Vehicle *vehicle = linuxEnvironment.getVehicle();
-    const char *acm_dev = linuxEnvironment.getEnvironment()->getDeviceAcm().c_str();
-    vehicle->advancedSensing->setAcmDevicePath(acm_dev);
-    if (vehicle == NULL) {
-        std::cout << "Vehicle not initialized, exiting.\n";
-        return -1;
-    }
+int
+main(int argc, char** argv)
+{
+  // define position file
+  ifstream posi_file;
 
-    // Initialize variables
-    int functionTimeout = 1;
-    // Obtain Control Authority
-    vehicle->control->obtainCtrlAuthority(functionTimeout);
+  // Setup OSDK.
+  bool        enableAdvancedSensing = true;
+  LinuxSetup  linuxEnvironment(argc, argv, enableAdvancedSensing);
+  Vehicle*    vehicle = linuxEnvironment.getVehicle();
+  const char* acm_dev =
+    linuxEnvironment.getEnvironment()->getDeviceAcm().c_str();
+  vehicle->advancedSensing->setAcmDevicePath(acm_dev);
+  if (vehicle == NULL)
+  {
+    std::cout << "Vehicle not initialized, exiting.\n";
+    return -1;
+  }
 
-    bool mainCamResult = vehicle->advancedSensing->startMainCameraStream();
-    if (!mainCamResult) {
-        cout << "Failed to Open Camera" << endl;
-        return 1;
-    }
+  // Initialize variables
+  int functionTimeout = 1;
+  // Obtain Control Authority
+  vehicle->control->obtainCtrlAuthority(functionTimeout);
 
-    CameraRGBImage mainImg;
-    const char winName[] = "My Camera";
-    char message1[100];
-    char message2[100];
-    Rect roi(0, 0, 0, 0);
+  bool mainCamResult = vehicle->advancedSensing->startMainCameraStream();
+  if (!mainCamResult)
+  {
+    cout << "Failed to Open Camera" << endl;
+    return 1;
+  }
 
-    KCFTracker *tracker = NULL;
-    TrackingUtility tu;
+  CameraRGBImage mainImg;
+  const char     winName[] = "My Camera";
+  char           message1[100];
+  char           message2[100];
+  Rect           roi(0, 0, 0, 0);
 
-    cv::namedWindow(winName, 1);
-    cv::setMouseCallback(winName, TrackingUtility::mouseCallback, (void *) &tu);
+  KCFTracker*     tracker = NULL;
+  TrackingUtility tu;
 
-    while (1) {
-        char c = cv::waitKey(10);
-        if (c == 27) {
-            if (tracker != NULL) {
-                delete tracker;
-                tracker = NULL;
-            }
-            break; // Quit if ESC is pressed
-        }
+  cv::namedWindow(winName, 1);
+  cv::setMouseCallback(winName, TrackingUtility::mouseCallback, (void*)&tu);
 
-        char x='g';
-        tu.getKey(c); //Internal states will be updated based on key pressed.
-
-        if (vehicle->advancedSensing->newMainCameraImageReady()) {
-            int dx = 0;
-            int dy = 0;
-            int yawRate = 0;
-            int pitchRate = 0;
-            timer trackerStartTime, trackerFinishTime;
-            duration trackerTimeDiff;
-
-            vehicle->advancedSensing->getMainCameraImage(mainImg);
-            Mat frame(mainImg.height, mainImg.width, CV_8UC3, mainImg.rawData.data(), mainImg.width * 3);
-
-
-            switch (tu.getState()) {
-                case TrackingUtility::STATE_IDLE:
-                    roi = tu.getROI();
-                    sprintf(message2, "Please select ROI and press g");
-                    break;
-
-                case TrackingUtility::STATE_INIT:
-                    cout << "g pressed, initialize tracker" << endl;
-                    sprintf(message2, "g pressed, initialize tracker");
-                    // roi = tu.getROI();
-                    roi=Rect(cv::Point(200,300),cv::Point(600,700));
-                    tracker = new KCFTracker(true, true, false, false);
-                    tracker->init(roi, frame);
-                    tu.startTracker();
-                    break;
-
-                case TrackingUtility::STATE_ONGOING:
-                    trackerStartTime = std::chrono::high_resolution_clock::now();
-                    roi = tracker->update(frame);
-                    trackerFinishTime = std::chrono::high_resolution_clock::now();
-                    trackerTimeDiff = trackerFinishTime - trackerStartTime;
-                    sprintf(message2, "Tracking: bounding box update time = %.2f ms\n",
-                            trackerTimeDiff.count() * 1000.0);
-
-                    // send gimbal speed command
-                    dx = (int) (roi.x + roi.width / 2 - mainImg.width / 2);
-                    dy = (int) (roi.y + roi.height / 2 - mainImg.height / 2);
-
-                    yawRate = dx;
-                    pitchRate = -dy;
-
-                    if (abs(dx) < 10) {
-                        yawRate = 0;
-                    }
-
-                    if (abs(dy) < 10) {
-                        pitchRate = 0;
-                    }
-
-                    DJI::OSDK::Gimbal::SpeedData gimbalSpeed;
-                    gimbalSpeed.roll = 0;
-                    gimbalSpeed.pitch = pitchRate;
-                    gimbalSpeed.yaw = yawRate;
-                    gimbalSpeed.gimbal_control_authority = 1;
-
-                    vehicle->gimbal->setSpeed(&gimbalSpeed);
-
-                    break;
-
-                case TrackingUtility::STATE_STOP:
-                    cout << "s pressed, stop tracker" << endl;
-                    sprintf(message2, "s pressed, stop tracker");
-                    delete tracker;
-                    tracker = NULL;
-                    tu.stopTracker();
-                    roi = tu.getROI();
-                    break;
-
-                default:
-                    break;
-            }
-
-            dx = roi.x + roi.width / 2 - mainImg.width / 2;
-            dy = roi.y + roi.height / 2 - mainImg.height / 2;
-
-            cv::circle(frame, Point(mainImg.width / 2, mainImg.height / 2), 5, cv::Scalar(255, 0, 0), 2, 8);
-            if (roi.width != 0) {
-                cv::circle(frame, Point(roi.x + roi.width / 2, roi.y + roi.height / 2), 3, cv::Scalar(0, 0, 255), 1, 8);
-
-                cv::line(frame, Point(mainImg.width / 2, mainImg.height / 2),
-                         Point(roi.x + roi.width / 2, roi.y + roi.height / 2),
-                         cv::Scalar(0, 255, 255));
-            }
-
-            cv::rectangle(frame, roi, cv::Scalar(0, 255, 0), 1, 8, 0);
-            cvtColor(frame, frame, COLOR_RGB2BGR);
-            sprintf(message1, "dx=%04d, dy=%04d", dx, dy);
-            putText(frame, message1, Point2f(20, 30), FONT_HERSHEY_SIMPLEX, 1, Scalar(0, 255, 0));
-            putText(frame, message2, Point2f(20, 60), FONT_HERSHEY_SIMPLEX, 1, Scalar(0, 255, 0));
-            cv::imshow(winName, frame);
-
-        }
-    }
-
-    vehicle->advancedSensing->stopMainCameraStream();
-
-    if (tracker) {
+  while (1)
+  {
+    char c = cv::waitKey(10);
+    if (c == 27)
+    {
+      if (tracker != NULL)
+      {
         delete tracker;
+        tracker = NULL;
+      }
+      break; // Quit if ESC is pressed
     }
 
-    return 0;
+    char x = 'g';
+    tu.getKey(c); // Internal states will be updated based on key pressed.
+
+    if (vehicle->advancedSensing->newMainCameraImageReady())
+    {
+      int      dx        = 0;
+      int      dy        = 0;
+      int      yawRate   = 0;
+      int      pitchRate = 0;
+      timer    trackerStartTime, trackerFinishTime;
+      duration trackerTimeDiff;
+
+      vehicle->advancedSensing->getMainCameraImage(mainImg);
+      Mat frame(mainImg.height,
+                mainImg.width,
+                CV_8UC3,
+                mainImg.rawData.data(),
+                mainImg.width * 3);
+
+      switch (tu.getState())
+      {
+        case TrackingUtility::STATE_IDLE:
+          roi = tu.getROI();
+          sprintf(message2, "Please select ROI and press g");
+          break;
+
+        case TrackingUtility::STATE_INIT:
+          // cout << "g pressed, initialize tracker" << endl;
+          // sprintf(message2, "g pressed, initialize tracker");
+          // roi = tu.getROI();
+          const char* path_img = "/home/dji/Downloads/123.png";
+          imwrite(path_img, frame);
+          system("bash /home/dji/Desktop/Onboard-SDK/tmp/setposition.sh");
+          posi_file.open("/tmp/position.txt");
+          // string position;
+          // posi_file >> position;
+          // cout << position;
+          // json j=json::parse(position);
+          json j;
+          posi_file >> j;
+          int x, y, weight, height;
+          x        = j["box_x"];
+          y        = j["box_y"];
+          weight   = j["box_w"];
+          height   = j["box_h"];
+          Point p1 = Point(x - weight, y - height);
+          Point p2 = Point(x + weight, y + height);
+          roi      = Rect(p1,p2);
+          tracker  = new KCFTracker(true, true, false, false);
+          tracker->init(roi, frame);
+          tu.startTracker();
+          break;
+
+        case TrackingUtility::STATE_ONGOING:
+          trackerStartTime  = std::chrono::high_resolution_clock::now();
+          roi               = tracker->update(frame);
+          trackerFinishTime = std::chrono::high_resolution_clock::now();
+          trackerTimeDiff   = trackerFinishTime - trackerStartTime;
+          sprintf(message2,
+                  "Tracking: bounding box update time = %.2f ms\n",
+                  trackerTimeDiff.count() * 1000.0);
+
+          // send gimbal speed command
+          dx = (int)(roi.x + roi.width / 2 - mainImg.width / 2);
+          dy = (int)(roi.y + roi.height / 2 - mainImg.height / 2);
+
+          yawRate   = dx;
+          pitchRate = -dy;
+
+          if (abs(dx) < 10)
+          {
+            yawRate = 0;
+          }
+
+          if (abs(dy) < 10)
+          {
+            pitchRate = 0;
+          }
+
+          DJI::OSDK::Gimbal::SpeedData gimbalSpeed;
+          gimbalSpeed.roll                     = 0;
+          gimbalSpeed.pitch                    = pitchRate;
+          gimbalSpeed.yaw                      = yawRate;
+          gimbalSpeed.gimbal_control_authority = 1;
+
+          vehicle->gimbal->setSpeed(&gimbalSpeed);
+
+          break;
+
+        case TrackingUtility::STATE_STOP:
+          cout << "s pressed, stop tracker" << endl;
+          sprintf(message2, "s pressed, stop tracker");
+          delete tracker;
+          tracker = NULL;
+          tu.stopTracker();
+          roi = tu.getROI();
+          break;
+
+        default:
+          break;
+      }
+
+      dx = roi.x + roi.width / 2 - mainImg.width / 2;
+      dy = roi.y + roi.height / 2 - mainImg.height / 2;
+
+      cv::circle(frame,
+                 Point(mainImg.width / 2, mainImg.height / 2),
+                 5,
+                 cv::Scalar(255, 0, 0),
+                 2,
+                 8);
+      if (roi.width != 0)
+      {
+        cv::circle(frame,
+                   Point(roi.x + roi.width / 2, roi.y + roi.height / 2),
+                   3,
+                   cv::Scalar(0, 0, 255),
+                   1,
+                   8);
+
+        cv::line(frame,
+                 Point(mainImg.width / 2, mainImg.height / 2),
+                 Point(roi.x + roi.width / 2, roi.y + roi.height / 2),
+                 cv::Scalar(0, 255, 255));
+      }
+
+      cv::rectangle(frame, roi, cv::Scalar(0, 255, 0), 1, 8, 0);
+      cvtColor(frame, frame, COLOR_RGB2BGR);
+      sprintf(message1, "dx=%04d, dy=%04d", dx, dy);
+      putText(frame,
+              message1,
+              Point2f(20, 30),
+              FONT_HERSHEY_SIMPLEX,
+              1,
+              Scalar(0, 255, 0));
+      putText(frame,
+              message2,
+              Point2f(20, 60),
+              FONT_HERSHEY_SIMPLEX,
+              1,
+              Scalar(0, 255, 0));
+      cv::imshow(winName, frame);
+    }
+  }
+
+  vehicle->advancedSensing->stopMainCameraStream();
+
+  if (tracker)
+  {
+    delete tracker;
+  }
+
+  return 0;
 }

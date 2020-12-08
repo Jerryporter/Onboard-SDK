@@ -4,5 +4,5 @@ if [ -z "`ls /tmp | grep "position.txt"`" ]; then
 else
     rm /tmp/position.txt
 fi
-cd /home/chy/Desktop/img_position/cmake-build-debug
-./img_position
+cd /home/dji/Downloads/darknet-master
+./darknet detect cfg/yolov3-tiny.cfg yolov3-tiny.weights ~/Downloads/123.jpg
